@@ -14,9 +14,9 @@ class Gaussiano:
   """
 
   def __init__(self, 
-               sigma: float,
-               mascara : tuple[int, int] = (0,0)
-               ):
+              sigma: float,
+              mascara : tuple[int, int] = (0,0)
+              ):
     """
       Filtrado por funcion gaussiana de sigma dado por parametro y una matriz
       mascara del tamano del blur del filtro.
