@@ -59,6 +59,14 @@ pip3 install -r requirements.txt
 nucleo/
 │
 ├── controlador/
+│   ├── ControladorPreprocesador.py
+│   ├── ControladorFiltrador.py
+│   ├── ControladorRealzador.py
+│   ├── ControladorTransformador.py
+│   ├── ControladorModelador.py
+│   ├── ControladorSegmentador.py
+│   ├── ControladorExtractor.py
+│   ├── ControladorAnalizador.py
 │   └── ControladorBioImagen.py # I/O, metadatos, e iteracion
 │
 ├── preprocesador/
@@ -95,10 +103,7 @@ nucleo/
 │   │   └── bilateral.py
 │   │
 │   ├── espectrales/                      # Dominio frecuencial
-│   │   ├── fft_pasabajo.py
-│   │   ├── fft_pasaalto.py
-│   │   ├── fft_pasabanda.py
-│   │   ├── fft_bandstop.py
+│   │   ├── metodos_ffts.py
 │   │   └── filtradoNotch.py
 │   │
 │   ├── multiescala/                      # Dominio Multiescala
@@ -191,7 +196,6 @@ nucleo/
 │   │   ├── redimensionar.py        # Resize
 │   │   ├── rotacion.py            
 │   │   └── remuestreo.py  
-│   │
 │   │
 │   └── matematico/        
 │        ├── transformacion_distancia.py
