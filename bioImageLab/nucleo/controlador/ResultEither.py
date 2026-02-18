@@ -12,21 +12,6 @@ E = TypeVar("E") # Error (Excepcion de error)
 F = TypeVar("F") # Failed-Transformation (Nuevo tipo de error su se decide transformar el error anterior)
 
 @dataclass(frozen=True)
-class Dimensiones:
-    T: int  # Time
-    Z: int  # Z-stack
-    C: int  # Channels
-    Y: int  # Height
-    X: int  # Width
-
-@dataclass(frozen=True)
-class BioImagenData:
-    datos: np.ndarray  # Shape [T, Z, C, Y, X]
-    dims: Dimensiones
-    canales: tuple[str, ...]
-    ruta_origen: Path
-
-@dataclass(frozen=True)
 class ErrorPipeline:
     etapa: str  # "lectura", "preprocesamiento", "procesamiento"
     mensaje: str
