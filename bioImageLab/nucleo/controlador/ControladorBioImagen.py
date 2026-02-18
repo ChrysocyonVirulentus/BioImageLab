@@ -1,28 +1,402 @@
+from __future__ import annotations
 import numpy as np
 import cv2
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Union, List, Optional, Tuple
+from typing import List, Optional, Tuple, Callable, Any, Iterator
 from bioio import BioImage
 import bioio_bioformats
-import matplotlib.pyplot as plt
 from enum import Enum
 
-# Tipos inmutables para manejar archivos
+from ResultEither import Resultado, Ok, Err # Para manejar Funcionalmente los Errores.
+
+# Tipos inmutables útiles
 
 @dataclass(frozen=True)
-class ImagenEstandar:
-    ruta: Path
+class Dimensiones:
+    T: int  # Tiempo
+    Z: int  # Z-stack
+    C: int  # Canales
+    Y: int  # Altura
+    X: int  # Ancho
+    
+    @property
+    def shape(self) -> Tuple[int, int, int, int, int]:
+        return (self.T, self.Z, self.C, self.Y, self.X)
+    
+    def total_cortes(self) -> int:
+        return self.T * self.Z * self.C
 
 @dataclass(frozen=True)
-class BioImagen:
+class BioImagenData:
+    """
+        Estructura unificada para cualquier tipo de imagen (estándar o bioimagen)
+    """
+    datos: np.ndarray  # Shape [T, Z, C, Y, X]
+    dims: Dimensiones
+    canales: Tuple[str, ...]
+    ruta_origen: Path
+    es_bioformato: bool = False  # Metadata para saber el origen
+    
+    def __post_init__(self):
+        # Validación inmutable: verificar consistencia
+        assert self.datos.shape == self.dims.shape, \
+            f"Shape {self.datos.shape} no coincide con dims {self.dims.shape}"
+        assert len(self.canales) == self.dims.C, \
+            f"Canales {len(self.canales)} no coincide con C={self.dims.C}"
+
+@dataclass(frozen=True)
+class ErrorBioImagen:
+    etapa: str  # "lectura", "procesamiento", "indexacion"
+    mensaje: str
+    ruta: Optional[Path] = None
+    causa: Optional[Exception] = None
+    
+    def con_contexto(self, nueva_etapa: str) -> ErrorBioImagen:
+        """
+            Añade contexto al pipeline de error
+        """
+        return replace(self, etapa=f"{nueva_etapa} -> {self.etapa}")
+
+@dataclass(frozen=True)
+class ModoImagen(Enum):
+    AUTO = "auto"
+    RGB = "rgb"
+    GRIS = "gris"
+
+# Funciones puras
+
+def clasificar_extension(ruta: Path) -> bool:
+    """True si es bioformato, False si es estándar"""
+    formatos_bio = {".ids", ".ics", ".tiff", ".tif"}
+    return ruta.suffix.lower() in formatos_bio
+
+
+def leer_bioformato(ruta: Path) -> Resultado[BioImage, ErrorBioImagen]:
+    """
+        Función pura para leer bioformatos
+    """
+    try:
+        img = BioImage(ruta, reader=bioio_bioformats.Reader)
+        return Ok(img)
+    except FileNotFoundError as e:
+        return Err(ErrorBioImagen(
+            etapa="lectura",
+            mensaje=f"Archivo bioformato no encontrado: {ruta}",
+            ruta=ruta,
+            causa=e
+        ))
+    except Exception as e:
+        return Err(ErrorBioImagen(
+            etapa="lectura",
+            mensaje=f"Error BioFormats: {str(e)}",
+            ruta=ruta,
+            causa=e
+        ))
+
+
+def leer_estandar(ruta: Path) -> Resultado[np.ndarray, ErrorBioImagen]:
+    """
+        Función pura para leer imágenes estándar con OpenCV
+    """
+    try:
+        img_raw = cv2.imread(str(ruta), cv2.IMREAD_UNCHANGED)
+        if img_raw is None:
+            return Err(ErrorBioImagen(
+                etapa="lectura",
+                mensaje=f"OpenCV no pudo leer: {ruta}",
+                ruta=ruta
+            ))
+        # Pasaje a 16-bit
+        if img_raw.dtype == np.uint8:
+            img_raw = img_raw.astype(np.uint16) * 257 # (65535 // 255)
+        return Ok(img_raw)
+    except Exception as e:
+        return Err(ErrorBioImagen(
+            etapa="lectura",
+            mensaje=f"Error OpenCV: {str(e)}",
+            ruta=ruta,
+            causa=e
+        ))
+
+def procesar_bioformato(
+    bioimg: BioImage, 
+    modo: ModoImagen
+) -> Resultado[BioImagenData, ErrorBioImagen]:
+    """
+        Procesa BioImage a estructura unificada.
+
+        Argumentos:
+            bioimg: BioImage
+            ruta: string o path
+
+        Retorna:
+            Callable: Retorna un Resultado con el array 2D.
+        
+        Complejidad:
+            O(1)
+    """
+    try:
+        img_data = bioimg.get_image_data("TZCYX")
+        channel_names = tuple(bioimg.channel_names)
+        
+        match modo:
+            case ModoImagen.AUTO:
+                datos = img_data
+                canales = channel_names
+                
+            case ModoImagen.RGB:
+                if img_data.shape[2] != 3:
+                    return Err(ErrorBioImagen(
+                        etapa="procesamiento",
+                        mensaje=f"Modo RGB requiere 3 canales, tiene {img_data.shape[2]}"
+                    ))
+                datos = img_data
+                canales = ("Rojo", "Verde", "Azul")
+                
+            case ModoImagen.GRIS:
+                datos = np.mean(img_data, axis=2, keepdims=True)
+                canales = ("Gris",)
+        
+        T, Z, C, Y, X = datos.shape
+        return Ok(BioImagenData(
+            datos=datos,
+            dims=Dimensiones(T, Z, C, Y, X),
+            canales=canales,
+            ruta_origen=Path(bioimg.path),
+            es_bioformato=True
+        ))
+        
+    except Exception as e:
+        return Err(ErrorBioImagen(
+            etapa="procesamiento",
+            mensaje=f"Error procesando bioformato: {str(e)}",
+            causa=e
+        ))
+
+def procesar_estandar(
+    img_raw: np.ndarray, 
+    modo: ModoImagen,
     ruta: Path
+) -> Resultado[BioImagenData, ErrorBioImagen]:
+    """
+        Procesa imagen estándar a estructura 5D unificada.
 
-TipoOrigen = Union[ImagenEstandar, BioImagen]
+        Argumentos:
+            Array: np.ndarray
+            modo: ModoImagen
+            ruta: string o path
 
+        Retorna:
+            Callable: Retorna un Resultado con el array 2D.
+        
+        Complejidad:
+            O(1)
+    """
+    try:
+        match modo:
+            case ModoImagen.AUTO:
+                if img_raw.ndim == 3 and img_raw.shape[2] == 3:
+                    # RGB: separar canales y crear dims 5D
+                    canales_rgb = [img_raw[:, :, i] for i in range(3)]
+                    datos = np.stack(canales_rgb, axis=0)[np.newaxis, np.newaxis, :, :, :]
+                    canales = ("Rojo", "Verde", "Azul")
+                else:
+                    # Grayscale: añadir dims
+                    datos = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
+                    canales = ("Gris",)
+                    
+            case ModoImagen.RGB:
+                if not (img_raw.ndim == 3 and img_raw.shape[2] == 3):
+                    return Err(ErrorBioImagen(
+                        etapa="procesamiento",
+                        mensaje="Modo RGB requiere imagen color (3 canales)"
+                    ))
+                canales_rgb = [img_raw[:, :, i] for i in range(3)]
+                datos = np.stack(canales_rgb, axis=0)[np.newaxis, np.newaxis, :, :, :]
+                canales = ("Rojo", "Verde", "Azul")
+                
+            case ModoImagen.GRIS:
+                if img_raw.ndim == 3 and img_raw.shape[2] == 3:
+                    img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2GRAY)
+                datos = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
+                canales = ("Gris",)
+        
+        T, Z, C, Y, X = datos.shape
+        return Ok(BioImagenData(
+            datos=datos,
+            dims=Dimensiones(T, Z, C, Y, X),
+            canales=canales,
+            ruta_origen=ruta,
+            es_bioformato=False
+        ))
+        
+    except Exception as e:
+        return Err(ErrorBioImagen(
+            etapa="procesamiento",
+            mensaje=f"Error procesando imagen estándar: {str(e)}",
+            causa=e
+        ))
+
+
+def cargar_imagen(ruta: Path, modo: ModoImagen = ModoImagen.AUTO) -> Resultado[BioImagenData, ErrorBioImagen]:
+    """
+        Función completo de carga: detecta tipo y procesa
+        
+        Argumentos:
+            ruta: String o Path
+            modo: ModoImagen
+
+        Retorna:
+            Callable: Retorna un Resultado con el array 2D.
+        
+        Complejidad:
+            O(1)
+    """
+    if clasificar_extension(ruta):
+        # Mini-Pipeline bioformato: leer -> procesar
+        return (
+            leer_bioformato(ruta)
+            .bind(lambda bioimg: procesar_bioformato(bioimg, modo))
+        )
+    else:
+        # Mini-Pipeline estándar: leer -> procesar
+        return (
+            leer_estandar(ruta)
+            .bind(lambda img_raw: procesar_estandar(img_raw, modo, ruta))
+        )
+
+# Funciones de transformación y de soporte
+
+def extraer_corte(
+    t: int = 0, 
+    z: int = 0, 
+    c: int = 0
+) -> Callable[[BioImagenData], Resultado[np.ndarray, ErrorBioImagen]]:
+    """
+        Genera una función para extraer un corte 2D específico de un BioImagenData.
+
+        Argumentos:
+            t (int): Índice temporal.
+            z (int): Índice de profundidad (Z-stack).
+            c (int): Índice del canal cromático.
+
+        Retorna:
+            Callable: Una función que recibe BioImagenData y retorna un Resultado con el array 2D.
+
+        Complejidad:
+            O(1) - Acceso directo por índice y copia de la vista 2D.
+    """
+    def _extraer(data: BioImagenData) -> Resultado[np.ndarray, ErrorBioImagen]:
+        dims = data.dims
+        if not (0 <= t < dims.T and 0 <= z < dims.Z and 0 <= c < dims.C):
+            return Err(ErrorBioImagen(
+                etapa="indexacion",
+                mensaje=f"Índices ({t},{z},{c}) fuera de rango {dims.shape[:3]}"
+            ))
+        return Ok(data.datos[t, z, c].copy())
+    return _extraer
+
+
+def aplicar_a_corte(
+    t: int, z: int, c: int,
+    operacion: Callable[[np.ndarray], np.ndarray]
+) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
+    """
+        Aplica una operación de procesamiento a un corte y retorna una nueva estructura.
+
+        Argumentos:
+            t (int): Índice temporal.
+            z (int): Índice de profundidad.
+            c (int): Índice del canal.
+            operacion (Callable): Función pura np.ndarray -> np.ndarray.
+
+        Retorna:
+            Callable: Función que retorna un nuevo BioImagenData con el corte modificado.
+
+        Complejidad:
+            O(N*M) donde N,M son dimensiones Y,X (debido a la copia del array completo).
+    """
+    def _aplicar(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
+        # Extraer
+        resultado_corte = extraer_corte(t, z, c)(data)
+        if resultado_corte.is_err():
+            return resultado_corte.map(lambda _: data)  # Propaga error
+        
+        corte = resultado_corte.unwrap()
+        
+        # Aplicar operación
+        try:
+            corte_procesado = operacion(corte)
+            if corte_procesado.shape != corte.shape:
+                return Err(ErrorBioImagen(
+                    etapa="procesamiento",
+                    mensaje=f"La operación alteró las dimensiones Y,X: {corte.shape} -> {corte_procesado.shape}"
+                ))
+        except Exception as e:
+            return Err(ErrorBioImagen(
+                etapa="procesamiento",
+                mensaje=f"Error en operación: {str(e)}",
+                causa=e
+            ))
+        
+        # Crear nuevo array con el corte modificado (inmutable)
+        nuevos_datos = data.datos.copy()
+        nuevos_datos[t, z, c] = corte_procesado
+        
+        return Ok(replace(data, datos=nuevos_datos))
+    
+    return _aplicar
+
+
+def iterar_cortes(
+    canal: Optional[int] = None
+) -> Callable[[BioImagenData], Resultado[List[Tuple[int, int, int, np.ndarray]], ErrorBioImagen]]:
+    """
+        Crea una lista de todos los cortes disponibles para iteración.
+
+        Arguments:
+            canal (Optional[int]): Si se especifica, filtra solo por ese canal.
+
+        Retorna:
+            Resultado: Una lista de tuplas (C, T, Z, array_2d).
+
+        Complejidad:
+            O(T * Z * C) en espacio y tiempo.
+    """
+    def _iterar(data: BioImagenData) -> Resultado[List[Tuple[int, int, int, np.ndarray]], ErrorBioImagen]:
+        try:
+            dims = data.dims
+            cortes = []
+            
+            rango_canales = [canal] if canal is not None else range(dims.C)
+            
+            if canal is not None and not (0 <= canal < dims.C):
+                return Err(ErrorBioImagen(
+                    etapa="indexacion",
+                    mensaje=f"Canal {canal} fuera de rango [0, {dims.C-1}]"
+                ))
+            
+            for c in rango_canales:
+                for t in range(dims.T):
+                    for z in range(dims.Z):
+                        cortes.append((c, t, z, data.datos[t, z, c].copy()))
+            
+            return Ok(cortes)
+        except Exception as e:
+            return Err(ErrorBioImagen(
+                etapa="iteracion",
+                mensaje=f"Error iterando: {str(e)}",
+                causa=e
+            ))
+    
+    return _iterar
+
+# Clase Controladora 
 class ControladorBioImagen:
     """
     Clase "Handler" para leer y preprocesar imágenes de microscopía en formato .png, .jpg, .tiff y formatos de bioimagen confocal como .ics/.ids.
+    Wrapper stateful que mantiene API compatible pero usa funciones puras internamente.
     Permite :
         - Leer y abrir este tipo de archivos.
         - Preprocesarlos a escala de grises y transformarlos en un MultiArray para "handlear" los diferentes tipos de canales, "z-stacking" y "time-lapse" según el tipo de imagen.
@@ -37,118 +411,59 @@ class ControladorBioImagen:
         ser solo lectura.
     """
 
-    def __init__(self, ruta_imagen):
+    def __init__(self, ruta_imagen: str | Path):
         self.ruta_imagen = Path(ruta_imagen)
-        self.configuracion: TipoOrigen = self._clasificar_imagen(self.ruta_imagen)
+        self._data: Optional[BioImagenData] = None
+        self._procesada: Optional[BioImagenData] = None # La imagen procesada
+        self._ultimo_error: Optional[ErrorBioImagen] = None
 
-        # Datos del MultiArray [T, Z, C, Y, X] pre-procesamiento
-        self.img: Optional[np.ndarray] = None
-        self.canales: List[str] = []
-        self.forma: Tuple[int, ...] = ()
-
-        # Versión del MultiArray post-procesamiento
-        self.img_procesada: Optional[np.ndarray] = None
+        # Errores
+        self._ultimo_error: Optional[ErrorBioImagen] = None
 
     def __bool__(self) -> bool:
-        # Metodo para indicar si o no está cargada la imagen.
-        return self.img is not None
+        return self._data is not None
+
+    @property
+    def forma(self) -> Tuple[int, ...]:
+        """
+            Retorna la forma 5D (T, Z, C, Y, X).
+        """
+        return self._data.dims.shape if self._data else (0, 0, 0, 0, 0)
     
-    class ModoImagen(Enum):
-        AUTO = "auto"       # Detección automática (gris o RGB para estándar; nativo para bio)
-        RGB = "rgb"         # Fuerza separación/preservación en canales RGB (3 canales)
-        GRIS = "gris"       # Fuerza conversión a escala de grises (1 canal)
-
-
-    def _clasificar_imagen(self, ruta: Path) -> TipoOrigen:
+    @property
+    def canales(self) -> Tuple[str, ...]:
         """
-            Determina el tipo de origen basado en la extensión (Fábrica).
+            Retorna los nombres de los canales cromáticos.
         """
-        formatos_bio = {".ids", ".ics", ".tiff", ".tif"}
-        if ruta.suffix.lower() in formatos_bio:
-            return BioImagen(ruta)
-        return ImagenEstandar(ruta)
+        return self._data.channel_names if self._data else ()
 
-    def leer_bioImagen(self, modo: ModoImagen = ModoImagen.AUTO) -> Optional[np.ndarray]:
+
+    def cargar_ImagenResultado(self, modo: ModoImagen = ModoImagen.AUTO) -> Resultado[BioImagenData, ErrorBioImagen]:
         """
-            Selector de modos para cargar y normalizar a 5D.
-            Delega el procesamiento del modo a funciones auxiliares para reducir anidamiento que son
-            _procesar_estandar y _procesar_bioimagen.
-            Costo : O(1)
-            Retorna : np.ndarray
+            Versión Resultado de cargar.
+
+            Retorna:
+                Resultado[BioImagenData, ErrorBioImagen]: Éxito o detalle del error.
         """
-        try:
-            match self.configuracion:
-                case BioImagen(ruta):
-                    img = BioImage(ruta, reader=bioio_bioformats.Reader)
-                    img_data = img.get_image_data("TZCYX")
-                    self.img, self.canales = self._procesar_bioimagen(img_data, img.channel_names, modo)
+        resultado = cargar_imagen(self.ruta_imagen, modo)
+        
+        if resultado.es_ok():
+            self._data = resultado.unwrap()
+            self._procesada = None  # Reset
+            self._ultimo_error = None
+        else:
+            self._ultimo_error = resultado.error
+        
+        return resultado
 
-                case ImagenEstandar(ruta):
-                    img_raw = cv2.imread(str(ruta), cv2.IMREAD_UNCHANGED)
-                    if img_raw is None:
-                        raise FileNotFoundError(f"Archivo no encontrado: {ruta}")
-                    # Normalización a 16-bit
-                    img_raw = img_raw.astype(np.uint16) * (65535 // 255) if img_raw.dtype == np.uint8 else img_raw
-                    self.img, self.canales = self._procesar_estandar(img_raw, modo)
-
-            if self.img is not None:
-                self.forma = self.img.shape
-                self.img_procesada = np.zeros_like(self.img)
-            return self.img
-
-        except Exception as e:
-            print(f"Error al leer la imagen: {e}")
-            return None
-
-    def _procesar_bioimagen(self, img_data: np.ndarray, channel_names: List[str], modo: ModoImagen) -> Tuple[np.ndarray, List[str]]:
+    def cargar(self, modo: ModoImagen = ModoImagen.AUTO) -> bool:
         """
-            Auxiliar para procesar bioimágenes según modo.
-            Retorna: (img_procesada, canales)
+            Carga la imagen. Retorna True si éxito, False si error.
+            Para manejo completo de errores, usar cargar_ImagenResultado()
         """
-        match modo:
-            case ModoImagen.AUTO:
-                return img_data, channel_names
+        return self.cargar_ImagenResultado(modo).es_ok()
 
-            case ModoImagen.RGB:
-                if img_data.shape[2] == 3:
-                    return img_data, ["Rojo", "Verde", "Azul"]
-                else:
-                    raise ValueError("Modo RGB requiere exactamente 3 canales en bioimagen")
-
-            case ModoImagen.GRIS:
-                img_gris = np.mean(img_data, axis=2, keepdims=True)
-                return img_gris, ["Gris"]
-
-    def _procesar_estandar(self, img_raw: np.ndarray, modo: ModoImagen) -> Tuple[np.ndarray, List[str]]:
-        """
-            Auxiliar para procesar imágenes estándar según modo.
-            Retorna: (img_procesada, canales)
-        """
-        match modo:
-            case ModoImagen.AUTO:
-                if img_raw.ndim == 3 and img_raw.shape[2] == 3:
-                    canales_rgb = [img_raw[:, :, i] for i in range(3)]
-                    img_rgb = np.stack(canales_rgb, axis=0)[np.newaxis, np.newaxis, :, :, :]
-                    return img_rgb, ["Rojo", "Verde", "Azul"]
-                else:
-                    img_gris = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
-                    return img_gris, ["Gris"]
-
-            case ModoImagen.RGB:
-                if img_raw.ndim == 3 and img_raw.shape[2] == 3:
-                    canales_rgb = [img_raw[:, :, i] for i in range(3)]
-                    img_rgb = np.stack(canales_rgb, axis=0)[np.newaxis, np.newaxis, :, :, :]
-                    return img_rgb, ["Rojo", "Verde", "Azul"]
-                else:
-                    raise ValueError("Modo RGB requiere imagen en color (3 canales)")
-
-            case ModoImagen.GRIS:
-                if img_raw.ndim == 3 and img_raw.shape[2] == 3:
-                    img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2GRAY)
-                img_gris = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
-                return img_gris, ["Gris"]
-
-    def __iter__(self):
+    def iterar(self, canal: Optional[int] = None):
         """
             Iterador para poder buscar o iterar para todos los canales por tiempo y por z-stack, 
             obteniendo imágenes bidimensionales para su procesamiento.
@@ -159,147 +474,54 @@ class ControladorBioImagen:
             Complejidad:
                 O(T*Z*C) iteraciones
         """
-
-        if self.img is None:
-            return iter(())
-        T, Z, C, _, _ = self.forma
-        for canal in range(C):
-            for t in range(T):
-                for z in range(Z):
-                    yield canal, t, z, self.img[t, z, canal].copy()
-
-    def iterar_cortes(self, canal: int = 0):
-        """
-            Iterador para poder buscar o iterar en un canal dado por tiempo y por z-stack, 
-            obteniendo imágenes bidimensionales para su procesamiento.
-
-            Argumentos:
-                canal: Canal a iterar (default: 0)
-
-            Yields:
-                Tupla (t, z, img_2d) donde img_2d es np.ndarray de forma (Y, X)
-
-            Complejidad:
-                O(T*Z) iteraciones
-        """
-        if self.img is None:
-            raise ValueError("Imagen no cargada")
-
-        T, Z, C, _, _ = self.forma
+        if self._data is None:
+            return iter([])
         
-        if not (0 <= canal < C):
-            raise IndexError(f"Canal {canal} fuera de rango. Canales disponibles: 0-{C-1}")
+        return iter(iterar_cortes(canal)(self._data).unwrap_or([]))
 
-        for t in range(T):
-            for z in range(Z):
-                yield t, z, self.img[t, z, canal].copy()
+    def __iter__(self):
+        return self.iterar()
 
-    def set_corte_procesado(self,
-                            canal: int = 0,
-                            t: int = 0,
-                            z: int = 0,
-                            img_2d: Optional[np.ndarray] = None):
+    def get_corte(self, 
+                t: int = 0, 
+                z: int = 0, 
+                c: int = 0, 
+                procesado: bool = False
+                ) -> Optional[np.ndarray]:
+        """
+            Obtiene un corte 2D. Prioriza la imagen procesada si se solicita.
+        
+            Argumentos:
+                t, z, c (int): Índices 5D.
+                procesado (bool): Si es True, intenta obtenerlo de la imagen modificada.
+
+            Costo:
+                O(1)
+        """
+        fuente = self._procesada if (procesado and self._procesada) else self._data
+        if fuente is None: return None
+        return extraer_corte(t, z, c)(fuente).unwrap_or(None)
+
+    def set_corte(self,
+                c: int = 0,
+                t: int = 0,
+                z: int = 0,
+                img_2d: Optional[np.ndarray] = None):
         """
             Método setter para guardar una imagen 2D procesada en la estructura tensor 5D.
             
-            Argumentos:
-                canal: Índice del canal (default: 0)
-                t: Índice del timelapse (default: 0)
-                z: Índice del z-stack (default: 0)
-                img_2d: Objeto np.ndarray a settear (si None, crea array de ceros)
-
-            Complejidad:
-                O(1)
+            Complejidad: O(N) donde N es el tamaño del tensor completo por la copia inmutable.
         """
-        if self.img_procesada is None:
-            raise ValueError("img_procesada no inicializada")
-
-        T, Z, C, Y, X = self.forma
+        if self._data is None or img_2d is None: return False
+        base = self._procesada if self._procesada else self._data
         
-        if not (0 <= t < T and 0 <= z < Z and 0 <= canal < C):
-            raise IndexError(f"Índices fuera de rango. T max: {T-1}, Z max: {Z-1}, C max: {C-1}")
-
-        if img_2d is None:
-            img_2d = np.zeros((Y, X), dtype=self.img.dtype)
-
-        assert img_2d.ndim == 2, "img_2d debe ser 2D con forma (Y, X)"
-        assert img_2d.shape == (Y, X), f"img_2d debe tener forma ({Y}, {X}), tiene {img_2d.shape}"
+        # Operación constante: ignora el valor anterior y pone el nuevo
+        resultado = aplicar_a_corte(t, z, c, lambda _: img_2d)(base)
         
-        self.img_procesada[t, z, canal] = img_2d
-    
-    def _get_corte(self, 
-                img: np.ndarray, 
-                canal: int,
-                t: int,
-                z: int) -> np.ndarray:
-        """
-            Función interna para realizar cortes en alguna estructura imagen 5D.
-            
-            Argumentos:
-                img: Array 5D [T, Z, C, Y, X]
-                canal: Índice del canal
-                t: Índice del timelapse
-                z: Índice del z-stack
-
-            Retorna:
-                Array 2D [Y, X]
-
-            Complejidad:
-                O(1) - solo indexación y copia
-        """
-        T, Z, C, _, _ = img.shape
-        
-        if not (0 <= t < T and 0 <= z < Z and 0 <= canal < C):
-            raise IndexError(f"Índices fuera de rango. T max: {T-1}, Z max: {Z-1}, C max: {C-1}")
-        
-        return img[t, z, canal].copy()
-
-    def get_corte_original(self,
-                        canal: int = 0,
-                        t: int = 0,
-                        z: int = 0) -> np.ndarray:
-        """
-            Método getter para obtener un corte de la estructura tensor 5D original.
-            
-            Argumentos:
-                canal: Índice del canal (default: 0)
-                t: Índice del timelapse (default: 0)
-                z: Índice del z-stack (default: 0)
-
-            Retorna:
-                Imagen 2D np.ndarray de forma (Y, X)
-
-            Complejidad:
-                O(1)
-        """
-        if self.img is None:
-            raise ValueError("Imagen original no cargada")
-
-        return self._get_corte(self.img, canal, t, z)
-
-    def get_corte_procesado(self,
-                            canal: int = 0,
-                            t: int = 0,
-                            z: int = 0) -> np.ndarray:
-        """
-            Método getter para obtener un corte de la estructura tensor 5D procesada.
-            
-            Argumentos:
-                canal: Índice del canal (default: 0)
-                t: Índice del timelapse (default: 0)
-                z: Índice del z-stack (default: 0)
-
-            Retorna:
-                Imagen 2D np.ndarray de forma (Y, X)
-
-            Complejidad:
-                O(1)
-        """
-        if self.img_procesada is None:
-            raise ValueError("No se ha hecho ninguna operación de procesamiento")
-
-        return self._get_corte(self.img_procesada, canal, t, z)
-
+        if resultado.es_ok():
+            self._procesada = resultado.unwrap()
+            return True
+        return False
 
     def __eq__(self, other) -> bool:
         """
@@ -324,103 +546,25 @@ class ControladorBioImagen:
             Complejida : O(1)
         """
 
-        if self.img is None:
-            return 0
-        T, Z, *_ = self.forma
+        if self._data is None: return 0
+        return self._data.dims.T * self._data.dims.Z
 
-        return T * Z
-
-    # Metodos para I/O externo : Abrir imagenes, liberar memoria y cachear los bioformatos.
+    # Metodos para I/O : Abrir imagenes, liberar memoria y cachear los bioformatos.
     def __enter__(self):
-        self.leer_bioImagen()
+        self.cargar()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.img = None
-        self.img_procesada = None
+    def __exit__(self, exc_type, exc_val, exc_tb): 
+        # O(1)
+        self._data = None
+        self._procesada = None
 
     def __repr__(self) -> str:
         """
             Metodo para debugging.
-            Retorna : String
+            Retorna : F-String
             Complejidad : O(1)
         """
-        if self.img is None:
-            return f"<ControladorBioImagen ruta='{self.ruta_imagen}' (no cargada)>"
-
-        T, Z, C, Y, X = self.forma
-
-        return (
-            f"<ControladorBioImagen "
-            f"ruta='{self.ruta_imagen.name}', "
-            f"forma=(T={T}, Z={Z}, C={C}, Y={Y}, X={X}), "
-            f"canales={self.canales}>"
-        )
-
-    # Metodos para Control de Calidad (CC):
-    
-    def cc_validar_estado(self) -> bool:
-        """
-            Método CC para validar el estado interno de la clase.
-            Retorna True si todo está OK; False si hay inconsistencias.
-            Útil para debugging: llama después de operaciones críticas.
-        """
-        errores = []
-        
-        # Check 1: Atributos básicos
-        if not isinstance(self.ruta_imagen, Path):
-            errores.append("ruta_imagen no es un Path válido")
-        if not isinstance(self.canales, list):
-            errores.append("canales no es una lista")
-        
-        # Check 2: Consistencia si img está cargada
-        if self.img is not None:
-            if self.forma != self.img.shape:
-                errores.append(f"forma ({self.forma}) no coincide con img.shape ({self.img.shape})")
-            if len(self.canales) != self.img.shape[2]:
-                errores.append(f"len(canales) ({len(self.canales)}) no coincide con C ({self.img.shape[2]})")
-            if self.img_procesada is not None and self.img_procesada.shape != self.img.shape:
-                errores.append("img_procesada.shape no coincide con img.shape")
-        
-        # Check 3: Tipos de datos
-        if self.img is not None and not isinstance(self.img, np.ndarray):
-            errores.append("img no es un np.ndarray")
-        
-        if errores:
-            logging.error(f"Errores de QC en ControladorBioImagen: {errores}")
-            return False
-        logging.info("QC de estado: OK")
-        return True
-
-    def cc_dump_estado(self, archivo: Optional[str] = None) -> str:
-        """
-            Método debugging para dump del estado interno.
-            Retorna string con info; opcionalmente guarda en archivo.
-            Útil para inspeccionar en debugging.
-        """
-        estado = f"""
-        Estado de ControladorBioImagen:
-        - Ruta: {self.ruta_imagen}
-        - Configuración: {self.configuracion}
-        - Cargada: {self.__bool__()}
-        - Forma: {self.forma}
-        - Canales: {self.canales}
-        - Img dtype: {self.img.dtype if self.img is not None else 'None'}
-        - Img_procesada inicializada: {self.img_procesada is not None}
-        - Repr: {self.__repr__()}
-        """
-        if archivo:
-            with open(archivo, 'w') as f:
-                f.write(estado)
-            logging.info(f"Estado dumpado a {archivo}")
-        return estado.strip()
-
-    def cc_log_operacion(self, operacion: str, detalles: dict = None):
-        """
-            Método para logging de operaciones clave.
-            Llama en métodos como leer_bioImagen() para tracing.
-        """
-        mensaje = f"Operación: {operacion}"
-        if detalles:
-            mensaje += f" - Detalles: {detalles}"
-        logging.debug(mensaje)
+        if self._data is None:
+            return f"<ControladorBioImagen ruta='{self.ruta_imagen.name}' (no cargada)>"
+        return f"<ControladorBioImagen ruta='{self.ruta_imagen.name}' forma={self.forma} canales={self.canales}>"

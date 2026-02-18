@@ -56,6 +56,41 @@ pip3 install -r requirements.txt
 ## Estructura del proyecto:
 
 ```bash
+┌─────────────────────────────────────────────────────────────┐
+│                    PIPELINE DE BIOIMAGEN                     │
+├─────────────────────────────────────────────────────────────┤
+│  1. PREPROCESAMIENTO  │ Normalización, corrección iluminación │
+│     (Preparar datos)  │ Flat-field, dark-current, white balance│
+├─────────────────────────────────────────────────────────────┤
+│  2. FILTRACIÓN        │ Reducción de ruido, suavizado         │
+│     (Limpiar señal)   │ Gaussiano, mediana, Wiener, NLMeans   │
+├─────────────────────────────────────────────────────────────┤
+│  3. REALZADORES       │ Mejora de características visibles    │
+│     (Resaltar info)   │ Contraste adaptativo, sharpening,     │
+│                       │ unsharp mask, gradientes (Sobel, etc)  │
+├─────────────────────────────────────────────────────────────┤
+│  4. TRANSFORMADORES   │ Cambios estructurales de la imagen    │
+│     (Reestructurar)   │ Rotación, registro, warping,          │
+│                       │ esqueletización, distancia transform  │
+├─────────────────────────────────────────────────────────────┤
+│  5. SEGMENTADORES     │ Separación de objetos de interés      │
+│     (Identificar ROI) │ Umbralización, watershed, region      │
+│                       │ growing, modelos de contorno (snakes)  │
+├─────────────────────────────────────────────────────────────┤
+│  6. CUANTIFICADORES   │ Medición de propiedades de objetos    │
+│     (Extraer números) │ Área, volumen, intensidad, textura,    │
+│                       │ forma, conteo de células, colocalización│
+├─────────────────────────────────────────────────────────────┤
+│  7. MODELADORES       │ Análisis estadístico/machine learning │
+│     (Inferir patrones)│ PCA, clustering, clasificación,       │
+│                       │ regresión, redes neuronales            │
+├─────────────────────────────────────────────────────────────┤
+│  8. ANALIZADORES      │ Visualización y exportación           │
+│     (Comunicar)       │ Plots, histogramas, heatmaps,         │
+│                       │ export a CSV/Excel, reportes PDF       │
+└─────────────────────────────────────────────────────────────┘
+```
+```bash
 nucleo/
 │
 ├── controlador/
@@ -294,6 +329,18 @@ nucleo/
     │
     ├── personalizados/
     └── validacion/
+```
+
+```bash
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Archivo       │────▶│  BioImage        │────▶│ BioImagenData   │
+│   (.ics/.ids)   │     │  (librería bioio)│     │ (tu estructura) │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                                              │
+┌─────────────────┐     ┌──────────────────┐                  │
+│   Archivo       │────▶│  np.ndarray      │──────────────────┘
+│   (.png/.jpg)   │     │  (OpenCV)        │
+└─────────────────┘     └──────────────────┘
 ```
 
 ## Ejemplo de uso

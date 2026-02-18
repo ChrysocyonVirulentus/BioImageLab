@@ -30,3 +30,22 @@ class FlujoProcesamiento:
         })
 
         return resultado
+
+from typing import Iterator
+
+# Generador que simula do-notation de Haskell
+def result_do(gen: Iterator[Result[T, E]]) -> Result[T, E]:
+    try:
+        return next(gen)
+    except StopIteration as e:
+        return e.value  # type: ignore
+
+# Ejemplo: pipeline con múltiples pasos dependientes
+def pipeline_complejo(ruta: Path) -> Result[np.ndarray, ErrorPipeline]:
+    def pasos():
+        img = yield leer_bioimagen(ruta)
+        correccion = yield aplicar_correccion_iluminacion(img)
+        segmentada = yield segmentar_celulas(correccion)
+        yield Ok(extraer_metricas(segmentada))
+    
+    return result_do(pasos())
