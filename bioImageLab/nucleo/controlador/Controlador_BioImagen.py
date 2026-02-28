@@ -8,7 +8,7 @@ from bioio import BioImage
 import bioio_bioformats
 from enum import Enum
 
-from ResultEither import Resultado, Ok, Err # Para manejar Funcionalmente los Errores.
+from Resultado_Either import Resultado, Ok, Err # Para manejar Funcionalmente los Errores.
 
 # Tipos inmutables útiles
 

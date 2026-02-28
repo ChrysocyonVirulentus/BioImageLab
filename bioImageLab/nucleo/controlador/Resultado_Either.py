@@ -1,6 +1,6 @@
 from __future__ import annotations # Para manejar el tipado limpio
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, Union, Final
+from typing import Generic, TypeVar, Callable, Union, Final, Generator, Any, Iterable
 from pathlib import Path
 import numpy as np
 
@@ -96,6 +96,7 @@ class Ok(Resultado[T, E]):
         try:
             return Ok(f(self._value))
         except Exception as e:
+            # Nota: Aquí convertir 'e' al tipo 'E' esperado
             return Err(e)  # type: ignore
 
     def bind(self, f: Callable[[T], Resultado[U, E]]) -> Resultado[U, E]: # Transfforma, pero si viene de Result (aplanar la estructura). Encadenado si hay fallo
@@ -115,7 +116,7 @@ class Ok(Resultado[T, E]):
 
 
 @dataclass(frozen=True)
-class Err(Result[T, E]):
+class Err(Resultado[T, E]):
     _error: E
 
     @property
@@ -150,3 +151,21 @@ class Err(Result[T, E]):
 
     def unwrap_or_else(self, f: Callable[[E], T]) -> T:
         return f(self._error)
+
+# Simular Do-Notation de Haskell
+def result_do(func: Callable[..., Generator[Resultado[Any, E], Any, Resultado[T, E]]]) -> Callable[..., Resultado[T, E]]:
+    def wrapper(*args, **kwargs) -> Resultado[T, E]:
+        gen = func(*args, **kwargs)
+        try:
+            # Obtener el primer Resultado
+            proximo_resultado = next(gen)
+            while True:
+                if proximo_resultado.es_err():
+                    return proximo_resultado  # Cortocircuito (Short-circuit)
+                
+                # "Desempaquetar" y enviamos de vuelta al yield
+                proximo_resultado = gen.send(proximo_resultado.unwrap())
+        except StopIteration as e:
+            # El 'return' de la función generadora es el resultado final
+            return e.value
+    return wrapper
