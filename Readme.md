@@ -102,7 +102,7 @@ nucleo/
 │   ├── ControladorSegmentador.py
 │   ├── ControladorExtractor.py
 │   ├── ControladorAnalizador.py
-│   └── ControladorBioImagen.py # I/O, metadatos, e iteracion
+│   └── Controlador_BioImagen.py # I/O, metadatos, e iteracion
 │
 ├── preprocesador/
 │   ├── normalizador/
@@ -131,38 +131,25 @@ nucleo/
 │
 ├── filtrador/                            # Su misión es la REDUCCIÓN (Ruido/Fondo)
 │   ├── locales/                          # Dominio espacial
-│   │   ├── gaussiano.py
-│   │   ├── mediana.py
-│   │   ├── difusionAnisotropica.py
-│   │   ├── cajaBlur.py
-│   │   └── bilateral.py
+│   │   └── Metodos_Locales.py            # CajaBlur, Gaussiano, Bilateral, Mediana, DifusionAnisotropica
 │   │
 │   ├── espectrales/                      # Dominio frecuencial
-│   │   ├── metodos_ffts.py
-│   │   └── filtradoNotch.py
+│   │   └── Metodos_Ffts.py               # Fast Fourier Transformations : PasaBajo, PasaAlto, PasaBanda, BandStop, FiltradoNotch
 │   │
 │   ├── multiescala/                      # Dominio Multiescala
-│   │   ├── diferenciaGaussiana.py
-│   │   ├── diferenciaLaplaciana.py
-│   │   ├── piramedesLaplacianas.py
-│   │   └── wavelets.py
+│   │   └── Metodos_Multiescala.py        # Diferencia Laplaciana, Diferencia Gaussiana, Wavelets, PiramideLaplaciana
 │   │
 │   ├── variacionales/                    
 │   │   └── total_variacion.py
 │   │
-│   └── noLocales/                        # Dominio No local
-│        ├── bm3d.py
-│        └── nlm.py                       # Non-local medians
+│   └── noLocales/                      # Dominio No local
+│        └── Metodos_NoLocales.py       # Non-local medians, Block-Matching 3D
 │
 │
-├── realzador/                            # Su misión es la EXPLICITACIÓN (Bordes/Detalle)
+├── realzador/                          # Su misión es la EXPLICITACIÓN (Bordes/Detalle)
 │   │
 │   ├── contraste/
-│   │   ├── clahe.py
-│   │   ├── gamma.py
-│   │   ├── log.py
-│   │   ├── retinex.py
-│   │   └── hist_eq.py
+│   │   └── Metodos_Constraste.py       # CLAHE, Gamma, Logaritmico, Retinex, EcuacionHistograma
 │   │
 │   ├── convolucion/
 │   │   ├── kernel_personalizado.py
@@ -176,12 +163,7 @@ nucleo/
 │   │   └── tikhonov.py
 │   │
 │   ├── morfologicos/
-│   │   ├── apertura.py
-│   │   ├── cierre.py
-│   │   ├── top_hat.py
-│   │   ├── bottom_hat.py
-│   │   ├── reconstruccion_morfologica.py
-│   │   └── gradienteMorfologico.py
+│   │   └── Metodos_Morfologicos.py     # Apertura, Cierre, Top-Hat, Bottom-Hat, Gradiente, Reconstruccion 
 │   │
 │   ├── afilacion/
 │   │   ├── afilacionLaplaciana.py

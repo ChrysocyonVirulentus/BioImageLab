@@ -29,43 +29,43 @@ from typing import List, Tuple
 
 class FiltroEspectral:
     """
-    Clase base para filtros espectrales basados en FFT.
-    
-    Maneja la infraestructura común de transformada de Fourier.
-    Las subclases solo necesitan implementar la generación de la máscara
-    en el dominio de frecuencias.
-    
-    Pipeline de filtrado:
-        1. FFT2D de la imagen
-        2. Centrar frecuencias (fftshift)
-        3. Aplicar máscara frecuencial
-        4. Descentrar (ifftshift)
-        5. IFFT2D para volver al dominio espacial
+        Clase base para filtros espectrales basados en FFT.
+        
+        Maneja la infraestructura común de transformada de Fourier.
+        Las subclases solo necesitan implementar la generación de la máscara
+        en el dominio de frecuencias.
+        
+        Pipeline de filtrado:
+            1. FFT2D de la imagen
+            2. Centrar frecuencias (fftshift)
+            3. Aplicar máscara frecuencial
+            4. Descentrar (ifftshift)
+            5. IFFT2D para volver al dominio espacial
     """
     nombre = "filtro_espectral_base"
     
     def generar_mascara(self, forma: Tuple[int, int], centro: Tuple[int, int]) -> np.ndarray:
         """
-        Genera la máscara de filtrado en el dominio de frecuencias.
-        
-        Args:
-            forma: (filas, columnas) de la imagen
-            centro: (centro_y, centro_x) de las frecuencias
+            Genera la máscara de filtrado en el dominio de frecuencias.
             
-        Returns:
-            Array 2D con la máscara (valores entre 0 y 1)
+            Args:
+                forma: (filas, columnas) de la imagen
+                centro: (centro_y, centro_x) de las frecuencias
+                
+            Returns:
+                Array 2D con la máscara (valores entre 0 y 1)
         """
         raise NotImplementedError("Subclases deben implementar generar_mascara")
     
     def __call__(self, img: np.ndarray) -> np.ndarray:
         """
-        Aplica el filtro espectral a la imagen.
-        
-        Args:
-            img: Array 2D (Y, X) con la imagen a filtrar
+            Aplica el filtro espectral a la imagen.
             
-        Returns:
-            Imagen filtrada del mismo tipo y forma
+            Args:
+                img: Array 2D (Y, X) con la imagen a filtrar
+                
+            Returns:
+                Imagen filtrada del mismo tipo y forma
         """
         if img.ndim != 2:
             raise ValueError(f"La imagen debe ser 2D, tiene {img.ndim} dimensiones")
@@ -99,34 +99,34 @@ class FiltroEspectral:
 
 class FFTPasabajo(FiltroEspectral):
     """
-    Filtro pasabajo (low-pass) gaussiano en el dominio de frecuencias.
-    
-    Atenúa las altas frecuencias (detalles finos, ruido) mientras preserva
-    las bajas frecuencias (estructuras grandes, tendencias).
-    
-    Ventajas:
-        - Suavizado global sin artefactos de borde
-        - Eliminación efectiva de ruido de alta frecuencia
-        - Control preciso mediante el radio de corte
-    
-    Desventajas:
-        - Difumina bordes y detalles finos
-        - Puede introducir ringing (oscilaciones) si el radio es muy pequeño
-    
-    Usos típicos:
-        - Reducción de ruido electrónico
-        - Suavizado de mapas de intensidad
-        - Preprocesamiento para análisis de estructuras grandes
-        - Eliminación de artefactos de alta frecuencia
+        Filtro pasabajo (low-pass) gaussiano en el dominio de frecuencias.
+        
+        Atenúa las altas frecuencias (detalles finos, ruido) mientras preserva
+        las bajas frecuencias (estructuras grandes, tendencias).
+        
+        Ventajas:
+            - Suavizado global sin artefactos de borde
+            - Eliminación efectiva de ruido de alta frecuencia
+            - Control preciso mediante el radio de corte
+        
+        Desventajas:
+            - Difumina bordes y detalles finos
+            - Puede introducir ringing (oscilaciones) si el radio es muy pequeño
+        
+        Usos típicos:
+            - Reducción de ruido electrónico
+            - Suavizado de mapas de intensidad
+            - Preprocesamiento para análisis de estructuras grandes
+            - Eliminación de artefactos de alta frecuencia
     """
     nombre = "fft_pasabajo"
     
     def __init__(self, radio: int = 30):
         """
-        Args:
-            radio: Radio de corte en píxeles (en el dominio de frecuencias)
-                  Valores típicos: 20-50 para microscopía
-                  Mayor radio = más suavizado
+            Args:
+                radio: Radio de corte en píxeles (en el dominio de frecuencias)
+                    Valores típicos: 20-50 para microscopía
+                    Mayor radio = más suavizado
         """
         if radio <= 0:
             raise ValueError("radio debe ser > 0")
@@ -134,9 +134,9 @@ class FFTPasabajo(FiltroEspectral):
     
     def generar_mascara(self, forma: Tuple[int, int], centro: Tuple[int, int]) -> np.ndarray:
         """
-        Genera máscara gaussiana que atenúa altas frecuencias.
-        
-        Forma: exp(-d²/(2σ²)) donde d es la distancia al centro
+            Genera máscara gaussiana que atenúa altas frecuencias.
+            
+            Forma: exp(-d²/(2σ²)) donde d es la distancia al centro
         """
         y, x = np.ogrid[-centro[0]:forma[0]-centro[0], -centro[1]:forma[1]-centro[1]]
         return np.exp(-(x**2 + y**2) / (2 * self.radio**2))
@@ -144,35 +144,35 @@ class FFTPasabajo(FiltroEspectral):
 
 class FFTPasaalto(FiltroEspectral):
     """
-    Filtro pasaalto (high-pass) gaussiano en el dominio de frecuencias.
-    
-    Atenúa las bajas frecuencias (iluminación desigual, fondos) mientras
-    preserva las altas frecuencias (bordes, detalles finos).
-    
-    Ventajas:
-        - Elimina variaciones lentas de iluminación
-        - Realza bordes y detalles finos
-        - Útil para corrección de fondo
-    
-    Desventajas:
-        - Amplifica ruido de alta frecuencia
-        - Reduce contraste global
-        - Puede crear halos alrededor de estructuras
-    
-    Usos típicos:
-        - Corrección de iluminación desigual
-        - Realce de bordes para segmentación
-        - Detección de detalles finos (vesículas, puncta)
-        - Eliminación de fondos variables
+        Filtro pasaalto (high-pass) gaussiano en el dominio de frecuencias.
+        
+        Atenúa las bajas frecuencias (iluminación desigual, fondos) mientras
+        preserva las altas frecuencias (bordes, detalles finos).
+        
+        Ventajas:
+            - Elimina variaciones lentas de iluminación
+            - Realza bordes y detalles finos
+            - Útil para corrección de fondo
+        
+        Desventajas:
+            - Amplifica ruido de alta frecuencia
+            - Reduce contraste global
+            - Puede crear halos alrededor de estructuras
+        
+        Usos típicos:
+            - Corrección de iluminación desigual
+            - Realce de bordes para segmentación
+            - Detección de detalles finos (vesículas, puncta)
+            - Eliminación de fondos variables
     """
     nombre = "fft_pasaalto"
     
     def __init__(self, radio: int = 10):
         """
-        Args:
-            radio: Radio de corte en píxeles (en el dominio de frecuencias)
-                  Valores típicos: 5-20 para microscopía
-                  Menor radio = más agresivo (elimina más frecuencias bajas)
+            Args:
+                radio: Radio de corte en píxeles (en el dominio de frecuencias)
+                    Valores típicos: 5-20 para microscopía
+                    Menor radio = más agresivo (elimina más frecuencias bajas)
         """
         if radio <= 0:
             raise ValueError("radio debe ser > 0")
@@ -190,35 +190,35 @@ class FFTPasaalto(FiltroEspectral):
 
 class FFTPasabanda(FiltroEspectral):
     """
-    Filtro pasabanda (band-pass) en el dominio de frecuencias.
-    
-    Preserva solo un rango específico de frecuencias, atenuando tanto
-    las muy bajas como las muy altas.
-    
-    Ventajas:
-        - Aislamiento de estructuras de tamaño específico
-        - Eliminación simultánea de fondo y ruido
-        - Control preciso del rango de frecuencias
-    
-    Desventajas:
-        - Puede eliminar información útil fuera de la banda
-        - Requiere conocimiento previo del tamaño de estructuras de interés
-    
-    Usos típicos:
-        - Detección de estructuras de tamaño específico (ej: células de ~20μm)
-        - Análisis de patrones periódicos
-        - Eliminación de ruido y fondo simultáneamente
-        - Análisis de texturas en rangos específicos de escala
+        Filtro pasabanda (band-pass) en el dominio de frecuencias.
+        
+        Preserva solo un rango específico de frecuencias, atenuando tanto
+        las muy bajas como las muy altas.
+        
+        Ventajas:
+            - Aislamiento de estructuras de tamaño específico
+            - Eliminación simultánea de fondo y ruido
+            - Control preciso del rango de frecuencias
+        
+        Desventajas:
+            - Puede eliminar información útil fuera de la banda
+            - Requiere conocimiento previo del tamaño de estructuras de interés
+        
+        Usos típicos:
+            - Detección de estructuras de tamaño específico (ej: células de ~20μm)
+            - Análisis de patrones periódicos
+            - Eliminación de ruido y fondo simultáneamente
+            - Análisis de texturas en rangos específicos de escala
     """
     nombre = "fft_pasabanda"
     
     def __init__(self, r_bajo: int = 5, r_alto: int = 50):
         """
-        Args:
-            r_bajo: Radio interno (frecuencias bajas a eliminar)
-            r_alto: Radio externo (frecuencias altas a eliminar)
-                   Valores típicos: r_bajo=5-15, r_alto=30-60
-                   La banda preservada está entre r_bajo y r_alto
+            Args:
+                r_bajo: Radio interno (frecuencias bajas a eliminar)
+                r_alto: Radio externo (frecuencias altas a eliminar)
+                    Valores típicos: r_bajo=5-15, r_alto=30-60
+                    La banda preservada está entre r_bajo y r_alto
         """
         if r_bajo >= r_alto:
             raise ValueError("r_bajo debe ser < r_alto")
@@ -246,34 +246,34 @@ class FFTPasabanda(FiltroEspectral):
 
 class FFTBandstop(FiltroEspectral):
     """
-    Filtro rechaza-banda (band-stop/notch) en el dominio de frecuencias.
-    
-    Elimina un rango específico de frecuencias mientras preserva el resto.
-    También conocido como filtro "band-reject" o "notch filter".
-    
-    Ventajas:
-        - Eliminación selectiva de ruido periódico
-        - Preserva frecuencias fuera de la banda rechazada
-        - Útil para interferencia de frecuencia conocida
-    
-    Desventajas:
-        - Puede crear artefactos si la banda es muy ancha
-        - Requiere conocimiento previo de la frecuencia del ruido
-    
-    Usos típicos:
-        - Eliminación de ruido de red eléctrica (50/60 Hz)
-        - Remoción de patrones periódicos de iluminación
-        - Corrección de interferencia de barrido (scanning artifacts)
-        - Eliminación de franjas periódicas (striping)
+        Filtro rechaza-banda (band-stop/notch) en el dominio de frecuencias.
+        
+        Elimina un rango específico de frecuencias mientras preserva el resto.
+        También conocido como filtro "band-reject" o "notch filter".
+        
+        Ventajas:
+            - Eliminación selectiva de ruido periódico
+            - Preserva frecuencias fuera de la banda rechazada
+            - Útil para interferencia de frecuencia conocida
+        
+        Desventajas:
+            - Puede crear artefactos si la banda es muy ancha
+            - Requiere conocimiento previo de la frecuencia del ruido
+        
+        Usos típicos:
+            - Eliminación de ruido de red eléctrica (50/60 Hz)
+            - Remoción de patrones periódicos de iluminación
+            - Corrección de interferencia de barrido (scanning artifacts)
+            - Eliminación de franjas periódicas (striping)
     """
     nombre = "fft_bandstop"
     
     def __init__(self, r_centro: int = 30, ancho: int = 5):
         """
-        Args:
-            r_centro: Radio central de la banda a rechazar (en píxeles)
-            ancho: Ancho de la banda de rechazo
-                  Valores típicos: r_centro=20-50, ancho=3-10
+            Args:
+                r_centro: Radio central de la banda a rechazar (en píxeles)
+                ancho: Ancho de la banda de rechazo
+                    Valores típicos: r_centro=20-50, ancho=3-10
         """
         if r_centro <= 0 or ancho <= 0:
             raise ValueError("r_centro y ancho deben ser > 0")
@@ -283,10 +283,10 @@ class FFTBandstop(FiltroEspectral):
     
     def generar_mascara(self, forma: Tuple[int, int], centro: Tuple[int, int]) -> np.ndarray:
         """
-        Genera máscara Butterworth que rechaza banda alrededor de r_centro.
-        
-        Forma: 1 / (1 + ((D*W) / (D² - D₀²))^(2n))
-        donde D es distancia, D₀ es r_centro, W es ancho, n es orden
+            Genera máscara Butterworth que rechaza banda alrededor de r_centro.
+            
+            Forma: 1 / (1 + ((D*W) / (D² - D₀²))^(2n))
+            donde D es distancia, D₀ es r_centro, W es ancho, n es orden
         """
         y, x = np.ogrid[-centro[0]:forma[0]-centro[0], -centro[1]:forma[1]-centro[1]]
         dist = np.sqrt(x**2 + y**2)
@@ -305,44 +305,44 @@ class FFTBandstop(FiltroEspectral):
 
 class FiltradoNotch(FiltroEspectral):
     """
-    Filtro notch para eliminación de múltiples frecuencias específicas.
-    
-    Elimina picos específicos en el espectro de frecuencias, ideal para
-    ruido periódico con frecuencias conocidas.
-    
-    Ventajas:
-        - Eliminación quirúrgica de múltiples frecuencias
-        - Automáticamente maneja puntos simétricos en el espectro
-        - Preserva todas las demás frecuencias
-    
-    Desventajas:
-        - Requiere identificación manual de frecuencias del ruido
-        - Puede dejar residuos si el radio es muy pequeño
-    
-    Usos típicos:
-        - Eliminación de ruido de red eléctrica
-        - Remoción de patrones Moiré
-        - Corrección de interferencia de múltiples fuentes
-        - Eliminación de artefactos de escaneo periódicos
-    
-    Nota:
-        Los puntos se especifican en coordenadas relativas al centro del espectro.
-        El filtro automáticamente maneja los puntos simétricos.
+        Filtro notch para eliminación de múltiples frecuencias específicas.
+        
+        Elimina picos específicos en el espectro de frecuencias, ideal para
+        ruido periódico con frecuencias conocidas.
+        
+        Ventajas:
+            - Eliminación quirúrgica de múltiples frecuencias
+            - Automáticamente maneja puntos simétricos en el espectro
+            - Preserva todas las demás frecuencias
+        
+        Desventajas:
+            - Requiere identificación manual de frecuencias del ruido
+            - Puede dejar residuos si el radio es muy pequeño
+        
+        Usos típicos:
+            - Eliminación de ruido de red eléctrica
+            - Remoción de patrones Moiré
+            - Corrección de interferencia de múltiples fuentes
+            - Eliminación de artefactos de escaneo periódicos
+        
+        Nota:
+            Los puntos se especifican en coordenadas relativas al centro del espectro.
+            El filtro automáticamente maneja los puntos simétricos.
     """
     nombre = "filtrado_notch"
     
     def __init__(self, puntos_ruido: List[Tuple[int, int]], radio: int = 5):
         """
-        Args:
-            puntos_ruido: Lista de (u, v) coordenadas en el espectro de Fourier
-                         donde se encuentran picos de ruido periódico.
-                         Coordenadas relativas al centro del espectro.
-            radio: Radio de cada notch gaussiano (en píxeles)
-                  Valores típicos: 3-10 píxeles
-        
-        Ejemplo:
-            # Eliminar pico en (20, 30) y su simétrico (-20, -30)
-            filtro = FiltradoNotch(puntos_ruido=[(20, 30)], radio=5)
+            Args:
+                puntos_ruido: Lista de (u, v) coordenadas en el espectro de Fourier
+                            donde se encuentran picos de ruido periódico.
+                            Coordenadas relativas al centro del espectro.
+                radio: Radio de cada notch gaussiano (en píxeles)
+                    Valores típicos: 3-10 píxeles
+            
+            Ejemplo:
+                # Eliminar pico en (20, 30) y su simétrico (-20, -30)
+                filtro = FiltradoNotch(puntos_ruido=[(20, 30)], radio=5)
         """
         if not puntos_ruido:
             raise ValueError("puntos_ruido no puede estar vacío")
@@ -354,10 +354,10 @@ class FiltradoNotch(FiltroEspectral):
     
     def generar_mascara(self, forma: Tuple[int, int], centro: Tuple[int, int]) -> np.ndarray:
         """
-        Genera máscara con múltiples notches gaussianos.
-        
-        Cada punto genera dos notches (el punto y su simétrico) debido a
-        la simetría hermitiana de la FFT de señales reales.
+            Genera máscara con múltiples notches gaussianos.
+            
+            Cada punto genera dos notches (el punto y su simétrico) debido a
+            la simetría hermitiana de la FFT de señales reales.
         """
         y, x = np.ogrid[-centro[0]:forma[0]-centro[0], -centro[1]:forma[1]-centro[1]]
         mascara = np.ones(forma, dtype=np.float64)

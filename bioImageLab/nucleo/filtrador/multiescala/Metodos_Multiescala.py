@@ -30,10 +30,10 @@ import warnings
 
 class FiltroMultiescala:
     """
-    Clase base para filtros que operan en múltiples escalas.
-    
-    Los filtros multiescala analizan la imagen en diferentes niveles de resolución
-    simultáneamente, permitiendo detectar estructuras de diferentes tamaños.
+        Clase base para filtros que operan en múltiples escalas.
+        
+        Los filtros multiescala analizan la imagen en diferentes niveles de resolución
+        simultáneamente, permitiendo detectar estructuras de diferentes tamaños.
     """
     nombre = "filtro_multiescala_base"
     
@@ -57,48 +57,48 @@ class FiltroMultiescala:
 
 class DiferenciaGaussiana(FiltroMultiescala):
     """
-    Filtro de Diferencia de Gaussianas (DoG) para detección de blobs.
-    
-    Resta dos imágenes gaussianas de diferente sigma, aproximando el operador
-    Laplaciano de Gaussiana (LoG). Detecta regiones circulares (blobs) que
-    difieren del fondo.
-    
-    Ecuación: DoG(x,y) = G(x,y,σ₂) - G(x,y,σ₁)
-    
-    Ventajas:
-        - Computacionalmente eficiente (más que LoG directo)
-        - Detecta blobs de tamaño específico
-        - Robusto ante ruido
-        - Invariante a cambios de iluminación
-    
-    Desventajas:
-        - Sensible a la elección de sigmas
-        - Puede crear artefactos de ringing
-        - No detecta estructuras elongadas
-    
-    Usos típicos:
-        - Detección de núcleos celulares
-        - Identificación de vesículas y puncta
-        - Detección de spots de fluorescencia
-        - Preprocesamiento para detección de blobs
-        - Aproximación rápida de LoG
-    
-    Relación con LoG:
-        DoG ≈ -∇²G cuando σ₂/σ₁ ≈ 1.6 (relación típica en Scale-Space)
+        Filtro de Diferencia de Gaussianas (DoG) para detección de blobs.
+        
+        Resta dos imágenes gaussianas de diferente sigma, aproximando el operador
+        Laplaciano de Gaussiana (LoG). Detecta regiones circulares (blobs) que
+        difieren del fondo.
+        
+        Ecuación: DoG(x,y) = G(x,y,σ₂) - G(x,y,σ₁)
+        
+        Ventajas:
+            - Computacionalmente eficiente (más que LoG directo)
+            - Detecta blobs de tamaño específico
+            - Robusto ante ruido
+            - Invariante a cambios de iluminación
+        
+        Desventajas:
+            - Sensible a la elección de sigmas
+            - Puede crear artefactos de ringing
+            - No detecta estructuras elongadas
+        
+        Usos típicos:
+            - Detección de núcleos celulares
+            - Identificación de vesículas y puncta
+            - Detección de spots de fluorescencia
+            - Preprocesamiento para detección de blobs
+            - Aproximación rápida de LoG
+        
+        Relación con LoG:
+            DoG ≈ -∇²G cuando σ₂/σ₁ ≈ 1.6 (relación típica en Scale-Space)
     """
     nombre = "diferencia_gaussiana"
     
     def __init__(self, sigma1: float = 1.0, sigma2: float = 2.0, k: Optional[float] = None):
         """
-        Args:
-            sigma1: Desviación estándar del primer gaussiano (escala fina)
-                   Típicamente 0.5-2.0 para microscopía
-            sigma2: Desviación estándar del segundo gaussiano (escala gruesa)
-                   Típicamente 1.5-4.0 para microscopía
-            k: Factor multiplicativo para sigma2 (si se proporciona, sigma2 = sigma1 * k)
-              Valor típico: k=1.6 (teoría de Scale-Space)
-        
-        Nota: Si se proporciona k, sigma2 se ignora y se calcula como sigma1 * k
+            Args:
+                sigma1: Desviación estándar del primer gaussiano (escala fina)
+                        Típicamente 0.5-2.0 para microscopía
+                sigma2: Desviación estándar del segundo gaussiano (escala gruesa)
+                        Típicamente 1.5-4.0 para microscopía
+                k: Factor multiplicativo para sigma2 (si se proporciona, sigma2 = sigma1 * k)
+                    Valor típico: k=1.6 (teoría de Scale-Space)
+            
+            Nota: Si se proporciona k, sigma2 se ignora y se calcula como sigma1 * k
         """
         if sigma1 <= 0:
             raise ValueError("sigma1 debe ser > 0")
@@ -118,13 +118,13 @@ class DiferenciaGaussiana(FiltroMultiescala):
     
     def __call__(self, img: np.ndarray) -> np.ndarray:
         """
-        Aplica la diferencia de gaussianas.
-        
-        Args:
-            img: Imagen 2D a filtrar
+            Aplica la diferencia de gaussianas.
             
-        Returns:
-            Imagen DoG (realza blobs del tamaño entre sigma1 y sigma2)
+            Args:
+                img: Imagen 2D a filtrar
+                
+            Returns:
+                Imagen DoG (realza blobs del tamaño entre sigma1 y sigma2)
         """
         self._validar_imagen(img)
         
@@ -154,37 +154,37 @@ class DiferenciaGaussiana(FiltroMultiescala):
 
 class DiferenciaLaplaciana(FiltroMultiescala):
     """
-    Filtro de Diferencia de Laplacianas (DoL) para detección multiescala.
-    
-    Similar a DoG pero usa el operador Laplaciano directamente en lugar de
-    gaussianas, proporcionando detección más precisa de estructuras.
-    
-    Ecuación: DoL(x,y) = ∇²G(x,y,σ₂) - ∇²G(x,y,σ₁)
-    
-    Ventajas:
-        - Detección más precisa que DoG
-        - Mejor localización de bordes
-        - Respuesta más limpia a estructuras circulares
-    
-    Desventajas:
-        - Más sensible al ruido que DoG
-        - Computacionalmente más costoso
-        - Requiere preprocesamiento para imágenes ruidosas
-    
-    Usos típicos:
-        - Detección precisa de núcleos
-        - Identificación de spots en imágenes de alta calidad
-        - Análisis de estructuras circulares
-        - Detección de cambios de curvatura
+        Filtro de Diferencia de Laplacianas (DoL) para detección multiescala.
+        
+        Similar a DoG pero usa el operador Laplaciano directamente en lugar de
+        gaussianas, proporcionando detección más precisa de estructuras.
+        
+        Ecuación: DoL(x,y) = ∇²G(x,y,σ₂) - ∇²G(x,y,σ₁)
+        
+        Ventajas:
+            - Detección más precisa que DoG
+            - Mejor localización de bordes
+            - Respuesta más limpia a estructuras circulares
+        
+        Desventajas:
+            - Más sensible al ruido que DoG
+            - Computacionalmente más costoso
+            - Requiere preprocesamiento para imágenes ruidosas
+        
+        Usos típicos:
+            - Detección precisa de núcleos
+            - Identificación de spots en imágenes de alta calidad
+            - Análisis de estructuras circulares
+            - Detección de cambios de curvatura
     """
     nombre = "diferencia_laplaciana"
     
     def __init__(self, sigma1: float = 1.0, sigma2: float = 2.0, ksize: int = 3):
         """
-        Args:
-            sigma1: Escala fina para suavizado previo
-            sigma2: Escala gruesa para suavizado previo
-            ksize: Tamaño del kernel Laplaciano (debe ser impar: 1, 3, 5, 7)
+            Args:
+                sigma1: Escala fina para suavizado previo
+                sigma2: Escala gruesa para suavizado previo
+                ksize: Tamaño del kernel Laplaciano (debe ser impar: 1, 3, 5, 7)
         """
         if sigma1 <= 0 or sigma2 <= sigma1:
             raise ValueError("sigma1 debe ser > 0 y sigma2 > sigma1")
@@ -197,13 +197,13 @@ class DiferenciaLaplaciana(FiltroMultiescala):
     
     def __call__(self, img: np.ndarray) -> np.ndarray:
         """
-        Aplica la diferencia de laplacianas.
-        
-        Args:
-            img: Imagen 2D a filtrar
+            Aplica la diferencia de laplacianas.
             
-        Returns:
-            Imagen DoL (detección de estructuras a múltiples escalas)
+            Args:
+                img: Imagen 2D a filtrar
+                
+            Returns:
+                Imagen DoL (detección de estructuras a múltiples escalas)
         """
         self._validar_imagen(img)
         
@@ -235,41 +235,41 @@ class DiferenciaLaplaciana(FiltroMultiescala):
 
 class PiramideLaplaciana(FiltroMultiescala):
     """
-    Pirámide Laplaciana para descomposición multiescala de la imagen.
-    
-    Descompone la imagen en una serie de imágenes de diferente resolución,
-    donde cada nivel contiene información de frecuencias específicas.
-    
-    Estructura:
-        Nivel 0: Detalles más finos (altas frecuencias)
-        Nivel 1-N: Detalles progresivamente más gruesos
-        Nivel N+1: Aproximación de baja resolución (residuo)
-    
-    Ventajas:
-        - Separación completa de escalas
-        - Reconstrucción perfecta posible
-        - Útil para análisis jerárquico
-        - Base para fusión de imágenes
-    
-    Desventajas:
-        - Genera múltiples imágenes (mayor uso de memoria)
-        - Requiere más procesamiento
-        - Necesita cuidado en los bordes
-    
-    Usos típicos:
-        - Análisis multiescala de texturas
-        - Fusión de imágenes multiescala
-        - Compresión de imágenes
-        - Análisis de frecuencias por bandas
-        - Detección de características a diferentes escalas
+        Pirámide Laplaciana para descomposición multiescala de la imagen.
+        
+        Descompone la imagen en una serie de imágenes de diferente resolución,
+        donde cada nivel contiene información de frecuencias específicas.
+        
+        Estructura:
+            Nivel 0: Detalles más finos (altas frecuencias)
+            Nivel 1-N: Detalles progresivamente más gruesos
+            Nivel N+1: Aproximación de baja resolución (residuo)
+        
+        Ventajas:
+            - Separación completa de escalas
+            - Reconstrucción perfecta posible
+            - Útil para análisis jerárquico
+            - Base para fusión de imágenes
+        
+        Desventajas:
+            - Genera múltiples imágenes (mayor uso de memoria)
+            - Requiere más procesamiento
+            - Necesita cuidado en los bordes
+        
+        Usos típicos:
+            - Análisis multiescala de texturas
+            - Fusión de imágenes multiescala
+            - Compresión de imágenes
+            - Análisis de frecuencias por bandas
+            - Detección de características a diferentes escalas
     """
     nombre = "piramide_laplaciana"
     
     def __init__(self, niveles: int = 4):
         """
-        Args:
-            niveles: Número de niveles de la pirámide (típicamente 3-6)
-                    Más niveles = análisis de escalas más gruesas
+            Args:
+                niveles: Número de niveles de la pirámide (típicamente 3-6)
+                        Más niveles = análisis de escalas más gruesas
         """
         if niveles < 1:
             raise ValueError("niveles debe ser >= 1")
@@ -280,14 +280,14 @@ class PiramideLaplaciana(FiltroMultiescala):
     
     def __call__(self, img: np.ndarray) -> List[np.ndarray]:
         """
-        Construye la pirámide laplaciana.
-        
-        Args:
-            img: Imagen 2D a descomponer
+            Construye la pirámide laplaciana.
             
-        Returns:
-            Lista de imágenes [L0, L1, ..., LN, Residuo]
-            donde Li es el nivel i de la pirámide laplaciana
+            Args:
+                img: Imagen 2D a descomponer
+                
+            Returns:
+                Lista de imágenes [L0, L1, ..., LN, Residuo]
+                donde Li es el nivel i de la pirámide laplaciana
         """
         self._validar_imagen(img)
         
@@ -325,13 +325,13 @@ class PiramideLaplaciana(FiltroMultiescala):
     
     def reconstruir(self) -> np.ndarray:
         """
-        Reconstruye la imagen original desde la pirámide laplaciana.
-        
-        Returns:
-            Imagen reconstruida
+            Reconstruye la imagen original desde la pirámide laplaciana.
             
-        Raises:
-            RuntimeError: Si no se ha construido la pirámide
+            Returns:
+                Imagen reconstruida
+                
+            Raises:
+                RuntimeError: Si no se ha construido la pirámide
         """
         if self.piramide_laplaciana is None:
             raise RuntimeError("Primero debes construir la pirámide con __call__()")
@@ -359,49 +359,49 @@ class PiramideLaplaciana(FiltroMultiescala):
 
 class Wavelet(FiltroMultiescala):
     """
-    Transformada Wavelet para análisis tiempo-frecuencia multiescala.
-    
-    Descompone la imagen usando wavelets, proporcionando localización tanto
-    en espacio como en frecuencia. Superior a Fourier para análisis local.
-    
-    Ventajas:
-        - Localización espacio-frecuencia simultánea
-        - Análisis multiescala adaptativo
-        - Compresión eficiente
-        - Detección de singularidades
-    
-    Desventajas:
-        - Requiere librería especializada (pywt)
-        - Elección de wavelet afecta resultados
-        - Más complejo de interpretar
-    
-    Usos típicos:
-        - Denoising selectivo por subbandas
-        - Compresión de imágenes
-        - Análisis de texturas multiescala
-        - Detección de bordes multiescala
-        - Separación de estructuras por escala
-    
-    Familias de wavelets comunes:
-        - 'db' (Daubechies): Buenas para propósito general
-        - 'haar': Simple, buena para bordes
-        - 'sym' (Symlets): Simétricas, buenas para análisis
-        - 'coif' (Coiflets): Suaves, buenas para imágenes naturales
+        Transformada Wavelet para análisis tiempo-frecuencia multiescala.
+        
+        Descompone la imagen usando wavelets, proporcionando localización tanto
+        en espacio como en frecuencia. Superior a Fourier para análisis local.
+        
+        Ventajas:
+            - Localización espacio-frecuencia simultánea
+            - Análisis multiescala adaptativo
+            - Compresión eficiente
+            - Detección de singularidades
+        
+        Desventajas:
+            - Requiere librería especializada (pywt)
+            - Elección de wavelet afecta resultados
+            - Más complejo de interpretar
+        
+        Usos típicos:
+            - Denoising selectivo por subbandas
+            - Compresión de imágenes
+            - Análisis de texturas multiescala
+            - Detección de bordes multiescala
+            - Separación de estructuras por escala
+        
+        Familias de wavelets comunes:
+            - 'db' (Daubechies): Buenas para propósito general
+            - 'haar': Simple, buena para bordes
+            - 'sym' (Symlets): Simétricas, buenas para análisis
+            - 'coif' (Coiflets): Suaves, buenas para imágenes naturales
     """
     nombre = "wavelet"
     
     def __init__(self, 
-                 wavelet: str = 'db4',
-                 nivel: int = 3,
-                 modo: Literal['zero', 'constant', 'symmetric', 'periodic', 'smooth', 'periodization'] = 'symmetric'):
+                wavelet: str = 'db4',
+                nivel: int = 3,
+                modo: Literal['zero', 'constant', 'symmetric', 'periodic', 'smooth', 'periodization'] = 'symmetric'):
         """
-        Args:
-            wavelet: Familia de wavelet a usar ('db1'-'db20', 'haar', 'sym2'-'sym20', 'coif1'-'coif5')
-            nivel: Número de niveles de descomposición (típicamente 2-5)
-            modo: Modo de manejo de bordes
-                 'symmetric': Reflexión simétrica (default, bueno para imágenes)
-                 'periodic': Asume imagen periódica
-                 'zero': Padding con ceros
+            Args:
+                wavelet: Familia de wavelet a usar ('db1'-'db20', 'haar', 'sym2'-'sym20', 'coif1'-'coif5')
+                nivel: Número de niveles de descomposición (típicamente 2-5)
+                modo: Modo de manejo de bordes
+                        'symmetric': Reflexión simétrica (default, bueno para imágenes)
+                        'periodic': Asume imagen periódica
+                        'zero': Padding con ceros
         """
         try:
             import pywt
@@ -425,19 +425,19 @@ class Wavelet(FiltroMultiescala):
     
     def __call__(self, img: np.ndarray) -> Tuple[np.ndarray, List[Tuple[np.ndarray, np.ndarray, np.ndarray]]]:
         """
-        Aplica la transformada wavelet 2D.
-        
-        Args:
-            img: Imagen 2D a descomponer
+            Aplica la transformada wavelet 2D.
             
-        Returns:
-            Tupla (cA, [detalles])
-            donde:
-                cA: Coeficientes de aproximación (baja frecuencia)
-                detalles: Lista de tuplas (cH, cV, cD) para cada nivel
-                    cH: Detalles horizontales
-                    cV: Detalles verticales
-                    cD: Detalles diagonales
+            Args:
+                img: Imagen 2D a descomponer
+                
+            Returns:
+                Tupla (cA, [detalles])
+                donde:
+                    cA: Coeficientes de aproximación (baja frecuencia)
+                    detalles: Lista de tuplas (cH, cV, cD) para cada nivel
+                        cH: Detalles horizontales
+                        cV: Detalles verticales
+                        cD: Detalles diagonales
         """
         self._validar_imagen(img)
         
@@ -458,16 +458,16 @@ class Wavelet(FiltroMultiescala):
     
     def reconstruir(self, coeficientes: Optional[List] = None) -> np.ndarray:
         """
-        Reconstruye la imagen desde los coeficientes wavelet.
-        
-        Args:
-            coeficientes: Coeficientes wavelet (si None, usa los últimos calculados)
+            Reconstruye la imagen desde los coeficientes wavelet.
             
-        Returns:
-            Imagen reconstruida
-            
-        Raises:
-            RuntimeError: Si no hay coeficientes disponibles
+            Args:
+                coeficientes: Coeficientes wavelet (si None, usa los últimos calculados)
+                
+            Returns:
+                Imagen reconstruida
+                
+            Raises:
+                RuntimeError: Si no hay coeficientes disponibles
         """
         if coeficientes is None:
             coeficientes = self.coeficientes
@@ -486,14 +486,14 @@ class Wavelet(FiltroMultiescala):
     
     def denoising(self, img: np.ndarray, umbral: float = 30.0) -> np.ndarray:
         """
-        Denoising mediante umbralización de coeficientes wavelet.
-        
-        Args:
-            img: Imagen a limpiar
-            umbral: Umbral para eliminar coeficientes pequeños (ruido)
+            Denoising mediante umbralización de coeficientes wavelet.
             
-        Returns:
-            Imagen limpia
+            Args:
+                img: Imagen a limpiar
+                umbral: Umbral para eliminar coeficientes pequeños (ruido)
+                
+            Returns:
+                Imagen limpia
         """
         # Descomponer
         cA, detalles = self(img)
