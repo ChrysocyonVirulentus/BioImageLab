@@ -155,7 +155,6 @@ nucleo/
 │   │   ├── kernel_personalizado.py
 │   │   └── psf_simulacion.py
 │   │
-│   │
 │   ├── deconvolucion/
 │   │   ├── wiener.py
 │   │   ├── richardson_lucy.py
@@ -166,15 +165,10 @@ nucleo/
 │   │   └── Metodos_Morfologicos.py     # Apertura, Cierre, Top-Hat, Bottom-Hat, Gradiente, Reconstruccion 
 │   │
 │   ├── afilacion/
-│   │   ├── afilacionLaplaciana.py
-│   │   ├── filtroHighBoost.py
-│   │   └── mascaraEnforque.py
+│   │   └── Metodos_Afilacion.py        # AfilacionLaplaciana, FiltroHighBoost, MascaraEnfoque, AfilacionGradiente, AfilacionWavelet, DeconvolucionLucy
 │   │
 │   ├── estructura/                     # Vesselness filters : Son realzadores que no buscan bordes, sino "tubos" (neuritas, vasos, filamentos de actina).
-│   │   ├── hessiano.py
-│   │   ├── frangi.py
-│   │   ├── sato.py
-│   │   └── tensor_estructura.py
+│   │   └── Metodos_Estructurales.py    # Hessiano, Frangi, Sato, TensorEstructural
 │   │ 
 │   └── gradientes/
 │       ├── laplaciano.py
