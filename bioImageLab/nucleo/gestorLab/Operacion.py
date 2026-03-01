@@ -1,8 +1,7 @@
 # === nucleo/pipeline/Operacion.py ===
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Any, Optional
-from nucleo.controlador.Resultado_Either import Resultado, ErrorBioImagen
-from nucleo.controlador.BioImagenData import BioImagenData
+from nucleo.controlador.Resultado_Either import Resultado, ErrorBioImagen, BioImagenData
 from .Categoria_Operacion import CategoriaOperacion
 
 @dataclass(frozen=True)

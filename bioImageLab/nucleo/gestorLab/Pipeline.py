@@ -1,8 +1,7 @@
 # === nucleo/pipeline/Pipeline.py ===
 from dataclasses import dataclass
 from typing import Tuple, List, Callable, Optional
-from nucleo.controlador.Resultado_Either import Resultado, Ok, Err, ErrorBioImagen
-from nucleo.controlador.BioImagenData import BioImagenData
+from nucleo.controlador.Resultado_Either import Resultado, Ok, Err, ErrorBioImagen, BioImagenData
 from .Operacion import Operacion
 
 @dataclass(frozen=True)
