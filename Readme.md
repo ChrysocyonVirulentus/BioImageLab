@@ -7,6 +7,10 @@ BioPictureTools es un conjunto de herramientas escritas en Python para procesar 
     -Manejo de sets de imágenes
     -Versiones compatibles con ambientes locales y Google Colab
 
+```bash
+¡AVISO! AUN EN DESARROLLO!
+```
+
 ## Características
 
     -Interfaz de línea de comando / scripts fáciles de usar
