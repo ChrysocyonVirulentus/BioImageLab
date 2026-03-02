@@ -177,10 +177,7 @@ nucleo/
 │   │   └── Segmentadores_Instanciales.py     # Watershed, WatershedMarcado, DistanciaWatershed, SplitDistancial, WatershedHibrido, SplitWatershed
 │   │
 │   ├── regional/
-│   │   ├── region_growing.py
-│   │   ├── random_walk.py
-│   │   ├── corte_grafico.py
-│   │   └── superpixel.py
+│   │   └── Segmentaodores_Regioneales.py     # RegionGrowing, RandomWalk, CorteGrafico, SuperpixelSLIC, SuperpixelFelzenszwalb, WatershedMarcas, MeanShift
 │   │
 │   ├── contornos_activos/
 │   │   ├── serpientes.py
@@ -191,19 +188,14 @@ nucleo/
 │       └── reetiquetado.py
 │
 ├── transformador/                  # Rotaciones, escalado, Warp manual  
-│   ├── geometrico/
-│   │   ├── deformar.py             # Warp
-│   │   ├── redimensionar.py        # Resize
-│   │   ├── rotacion.py            
-│   │   └── remuestreo.py  
+│   ├── geometricos/ 
+│   │   └── Transfromadores_Geometricos.py  
 │   │
-│   └── matematico/        
-│        ├── transformacion_distancia.py
-│        ├── esqueletizacion.py
-│        ├── eje_medial.py            
-│        ├── radon.py
-│        ├── fourier.py            
-│        └── tranformacion_wavelet.py      
+│   ├── espectrales/ 
+│   │   └── Transfromadores_Espectrales.py  
+│   │ 
+│   └── integrales/             
+│        └── Transfromadores_Proyectivos.py      
 │
 ├── modelador/                 
 │   ├── dimensionalidad/                 
