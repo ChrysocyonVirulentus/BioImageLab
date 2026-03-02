@@ -67,17 +67,24 @@ class DiferenciaGaussiana(FiltroMultiescala):
         
         Ventajas:
             - Computacionalmente eficiente (más que LoG directo)
+            - Más eficiente que LoG (dos gaussianas vs Laplaciano de gaussiana)
             - Detecta blobs de tamaño específico
             - Robusto ante ruido
             - Invariante a cambios de iluminación
+            - Fundamento biológico (modela visión)
         
         Desventajas:
             - Sensible a la elección de sigmas
             - Puede crear artefactos de ringing
             - No detecta estructuras elongadas
+            - No es isotrópico perfecto (aproximación)
+            - Puede detectar bordes fantasmas (artefactos)
+            - Menos preciso que Canny en localización
         
         Usos típicos:
-            - Detección de núcleos celulares
+            - Detección de células/blobs de diferentes tamaños
+            - Segmentación de núcleos con variabilidad de tamaño
+            - Realce de puntos sinápticos (puncta)
             - Identificación de vesículas y puncta
             - Detección de spots de fluorescencia
             - Preprocesamiento para detección de blobs

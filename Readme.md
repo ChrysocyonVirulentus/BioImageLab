@@ -131,61 +131,50 @@ nucleo/
 │
 ├── filtrador/                            # Su misión es la REDUCCIÓN (Ruido/Fondo)
 │   ├── locales/                          # Dominio espacial
-│   │   └── Metodos_Locales.py            # CajaBlur, Gaussiano, Bilateral, Mediana, DifusionAnisotropica
+│   │   └── Filtros_Locales.py            # CajaBlur, Gaussiano, Bilateral, Mediana, DifusionAnisotropica
 │   │
 │   ├── espectrales/                      # Dominio frecuencial
-│   │   └── Metodos_Ffts.py               # Fast Fourier Transformations : PasaBajo, PasaAlto, PasaBanda, BandStop, FiltradoNotch
+│   │   └── Filtros_Ffts.py               # Fast Fourier Transformations : PasaBajo, PasaAlto, PasaBanda, BandStop, FiltradoNotch
 │   │
 │   ├── multiescala/                      # Dominio Multiescala
-│   │   └── Metodos_Multiescala.py        # Diferencia Laplaciana, Diferencia Gaussiana, Wavelets, PiramideLaplaciana
+│   │   └── Filtros_Multiescala.py        # Diferencia Laplaciana, Diferencia Gaussiana, Wavelets, PiramideLaplaciana
 │   │
 │   ├── variacionales/                    
 │   │   └── total_variacion.py
 │   │
 │   └── noLocales/                      # Dominio No local
-│        └── Metodos_NoLocales.py       # Non-local medians, Block-Matching 3D
+│        └── Filtros_NoLocales.py       # Non-local medians, Block-Matching 3D
 │
 │
 ├── realzador/                          # Su misión es la EXPLICITACIÓN (Bordes/Detalle)
 │   │
 │   ├── contraste/
-│   │   └── Metodos_Constraste.py       # CLAHE, Gamma, Logaritmico, Retinex, EcuacionHistograma
+│   │   └── Realzadores_Constraste.py       # CLAHE, Gamma, Logaritmico, Retinex, EcuacionHistograma
 │   │
 │   ├── convolucion/
-│   │   ├── kernel_personalizado.py
-│   │   └── psf_simulacion.py
+│   │   └── Realzadores_Convolucion.py      # KernelPersonalizado, PSFSimulacion, KernelSeparable, ConvolucionFrecuencia, CorreccionBordes
 │   │
 │   ├── deconvolucion/
-│   │   ├── wiener.py
-│   │   ├── richardson_lucy.py
-│   │   ├── blind_deconvolucion.py
-│   │   └── tikhonov.py
+│   │   └── Realzadores_Deconvolucion.py    # Wiener, RichardsonLucy, BlindDeconvolucion, Tikhonov
 │   │
 │   ├── morfologicos/
-│   │   └── Metodos_Morfologicos.py     # Apertura, Cierre, Top-Hat, Bottom-Hat, Gradiente, Reconstruccion 
+│   │   └── Realzadores_Morfologicos.py     # Apertura, Cierre, Top-Hat, Bottom-Hat, Gradiente, Reconstruccion 
 │   │
 │   ├── afilacion/
-│   │   └── Metodos_Afilacion.py        # AfilacionLaplaciana, FiltroHighBoost, MascaraEnfoque, AfilacionGradiente, AfilacionWavelet, DeconvolucionLucy
+│   │   └── Realzadores_Afilacion.py        # AfilacionLaplaciana, FiltroHighBoost, MascaraEnfoque, AfilacionGradiente, AfilacionWavelet
 │   │
-│   ├── estructura/                     # Vesselness filters : Son realzadores que no buscan bordes, sino "tubos" (neuritas, vasos, filamentos de actina).
-│   │   └── Metodos_Estructurales.py    # Hessiano, Frangi, Sato, TensorEstructural
+│   ├── estructura/                         # Vesselness filters : Son realzadores que no buscan bordes, sino "tubos" (neuritas, vasos, filamentos de actina).
+│   │   └── Realzadores_Estructurales.py    # Hessiano, Frangi, Sato, TensorEstructural
 │   │ 
 │   └── gradientes/
-│       ├── laplaciano.py
-│       ├── canny.py
-│       ├── sobel.py
-│       └── scharr.py
+│       └── Realzadores_Gradientes.py       # Laplaciano, LaplacianoCero, Canny, Sobel, Scharr, Prewitt, Roberts 
 │
 ├── segmentador/
-│   ├── binarizacion/
-│   │   ├── metodosBinarizacion.py      # otsu, global, adaptativo, percentil
-│   │   └── binarizador.py
+│   ├── binarizacion/  
+│   │   └── Segmentadores_Binarizacion.py     # otsu, global, adaptativo, percentil, triangle, yen, li, isodata, minimum, mean
 │   │
 │   ├── instancial/
-│   │   ├── watershed.py
-│   │   ├── marcado.py                  # watershedMarcado
-│   │   ├── distancia_watersher.py
-│   │   └── splitDistancial.py
+│   │   └── Segmentadores_Instanciales.py     # Watershed, WatershedMarcado, DistanciaWatershed, SplitDistancial, WatershedHibrido, SplitWatershed
 │   │
 │   ├── regional/
 │   │   ├── region_growing.py
@@ -310,7 +299,7 @@ nucleo/
 ```bash
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │   Archivo       │────▶│  BioImage        │────▶│ BioImagenData   │
-│   (.ics/.ids)   │     │  (librería bioio)│     │ (tu estructura) │
+│   (.ics/.ids)   │     │  (librería bioio)│     │ (estructura) │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                                               │
 ┌─────────────────┐     ┌──────────────────┐                  │

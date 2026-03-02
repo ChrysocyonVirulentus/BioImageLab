@@ -490,3 +490,243 @@ img_realzada = clahe(img_uint8)  # uint8 → uint8
 # O para Gamma (no requiere uint8)
 gamma = Gamma(gamma=0.7)
 img_gamma = gamma(img_uint8)  # uint8 → uint8
+
+from metodos_binarizacion import (
+    Otsu, Global, Adaptativo, Percentil,
+    Triangle, Mean, Isodata, Minimum
+)
+
+# --- 1. Otsu (automático, óptimo) ---
+otsu = Otsu()
+umbral, img_binaria = otsu(img_nucleos)
+print(f"Umbral Otsu: {umbral:.2f}")
+
+# --- 2. Global (manual, control total) ---
+global_bin = Global(umbral=128, invertir=False)
+umbral, img_binaria = global_bin(img)
+
+# --- 3. Adaptativo (iluminación desigual) ---
+adaptativo = Adaptativo(
+    tamaño_ventana=15,
+    metodo='gaussian',  # o 'mean'
+    C=2.0
+)
+_, img_binaria = adaptativo(img_brightfield)
+
+# --- 4. Percentil (control por porcentaje) ---
+percentil = Percentil(percentil=95)  # Top 5% más brillante
+umbral, img_binaria = percentil(img_spots)
+
+# --- 5. Triangle (histograma asimétrico) ---
+triangle = Triangle()
+umbral, img_binaria = triangle(img_asimetrica)
+
+# --- 6. Mean (rápido y simple) ---
+mean = Mean()
+umbral, img_binaria = mean(img)
+
+# --- 7. Isodata (iterativo robusto) ---
+isodata = Isodata(max_iter=100, tol=0.5)
+umbral, img_binaria = isodata(img_celulas)
+
+# --- 8. Minimum (mínimo entre picos) ---
+minimum = Minimum(suavizado=5)
+umbral, img_binaria = minimum(img_bimodal)
+
+import matplotlib.pyplot as plt
+
+img = cargar_imagen_nucleos()
+
+metodos = {
+    'Otsu': Otsu(),
+    'Percentil 90': Percentil(90),
+    'Triangle': Triangle(),
+    'Adaptativo': Adaptativo(15, 'gaussian', 2),
+    'Isodata': Isodata(),
+    'Mean': Mean()
+}
+
+fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+axes = axes.ravel()
+
+for i, (nombre, metodo) in enumerate(metodos.items()):
+    umbral, img_bin = metodo(img)
+    axes[i].imshow(img_bin, cmap='gray')
+    if umbral is not None:
+        axes[i].set_title(f'{nombre}\nUmbral: {umbral:.1f}')
+    else:
+        axes[i].set_title(f'{nombre}\n(Umbral adaptativo)')
+    axes[i].axis('off')
+
+plt.tight_layout()
+plt.show()
+
+def visualizar_umbrales(img):
+    """Visualiza imagen, histograma y diferentes umbrales."""
+    metodos = {
+        'Otsu': Otsu(),
+        'Triangle': Triangle(),
+        'Mean': Mean(),
+        'Percentil 90': Percentil(90)
+    }
+    
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+    
+    # Imagen original
+    axes[0].imshow(img, cmap='gray')
+    axes[0].set_title('Imagen Original')
+    axes[0].axis('off')
+    
+    # Histograma con umbrales marcados
+    axes[1].hist(img.ravel(), bins=256, alpha=0.7, color='blue')
+    axes[1].set_title('Histograma con Umbrales')
+    axes[1].set_xlabel('Intensidad')
+    axes[1].set_ylabel('Frecuencia')
+    
+    colores = ['red', 'green', 'orange', 'purple']
+    for (nombre, metodo), color in zip(metodos.items(), colores):
+        umbral, _ = metodo(img)
+        if umbral is not None:
+            axes[1].axvline(umbral, color=color, linestyle='--', 
+                          linewidth=2, label=f'{nombre}: {umbral:.1f}')
+    
+    axes[1].legend()
+    plt.tight_layout()
+    plt.show()
+
+visualizar_umbrales(img_test)
+
+# --- Pipeline 1: Segmentación de núcleos DAPI ---
+def segmentar_nucleos_dapi(img):
+    from operadores_morfologicos import Apertura, Cierre
+    
+    # 1. Binarizar con Otsu
+    otsu = Otsu()
+    _, img_bin = otsu(img)
+    
+    # 2. Limpiar con morfología
+    apertura = Apertura(tamaño=(3, 3), forma='elipse')
+    img_limpia = apertura(img_bin)
+    
+    cierre = Cierre(tamaño=(5, 5), forma='elipse')
+    img_final = cierre(img_limpia)
+    
+    return img_final
+
+# --- Pipeline 2: Brightfield con iluminación desigual ---
+def segmentar_brightfield(img):
+    # Adaptativo es mejor para iluminación variable
+    adaptativo = Adaptativo(
+        tamaño_ventana=21,
+        metodo='gaussian',
+        C=5.0
+    )
+    _, img_bin = adaptativo(img)
+    return img_bin
+
+# --- Pipeline 3: Detección de spots ---
+def detectar_spots(img, sensibilidad='medio'):
+    """
+    Detecta spots usando percentil.
+    
+    Args:
+        sensibilidad: 'alto'=98, 'medio'=95, 'bajo'=90
+    """
+    percentiles = {'alto': 98, 'medio': 95, 'bajo': 90}
+    p = percentiles.get(sensibilidad, 95)
+    
+    percentil = Percentil(percentil=p)
+    umbral, img_spots = percentil(img)
+    
+    print(f"Umbral (percentil {p}): {umbral:.2f}")
+    return img_spots
+
+# --- Pipeline 4: Comparación de métodos automáticos ---
+def comparar_metodos_automaticos(img):
+    """
+    Compara diferentes métodos automáticos y retorna el mejor.
+    """
+    metodos = {
+        'Otsu': Otsu(),
+        'Triangle': Triangle(),
+        'Isodata': Isodata(),
+    }
+    
+    resultados = {}
+    for nombre, metodo in metodos.items():
+        umbral, img_bin = metodo(img)
+        # Calcular métricas (ej: % de píxeles blancos)
+        porcentaje_objetos = (img_bin == 255).sum() / img_bin.size * 100
+        resultados[nombre] = {
+            'umbral': umbral,
+            'binaria': img_bin,
+            'porcentaje': porcentaje_objetos
+        }
+    
+    return resultados
+
+# --- Pipeline 5: Binarización robusta con validación ---
+def binarizar_con_validacion(img, metodo_preferido='otsu'):
+    """
+    Binariza con validación de calidad.
+    """
+    metodos_backup = [
+        ('otsu', Otsu()),
+        ('triangle', Triangle()),
+        ('isodata', Isodata()),
+    ]
+    
+    for nombre, metodo in metodos_backup:
+        umbral, img_bin = metodo(img)
+        
+        # Validar resultado
+        porcentaje = (img_bin == 255).sum() / img_bin.size * 100
+        
+        # Criterio: objetos deben ser 5-70% de la imagen
+        if 5 <= porcentaje <= 70:
+            print(f"Método '{nombre}' exitoso: {porcentaje:.1f}% objetos")
+            return umbral, img_bin
+        else:
+            print(f"Método '{nombre}' descartado: {porcentaje:.1f}% objetos")
+    
+    # Si todos fallan, usar percentil 90 como fallback
+    print("Usando Percentil 90 como fallback")
+    return Percentil(90)(img)
+
+def analizar_binarizacion(img, metodo):
+    """Analiza la calidad de la binarización."""
+    umbral, img_bin = metodo(img)
+    
+    # Métricas
+    total_pixeles = img.size
+    pixeles_objeto = (img_bin == 255).sum()
+    pixeles_fondo = (img_bin == 0).sum()
+    
+    porcentaje_objeto = pixeles_objeto / total_pixeles * 100
+    porcentaje_fondo = pixeles_fondo / total_pixeles * 100
+    
+    # Intensidades promedio
+    if pixeles_objeto > 0:
+        intensidad_objeto = img[img_bin == 255].mean()
+    else:
+        intensidad_objeto = 0
+    
+    if pixeles_fondo > 0:
+        intensidad_fondo = img[img_bin == 0].mean()
+    else:
+        intensidad_fondo = 0
+    
+    separacion = abs(intensidad_objeto - intensidad_fondo)
+    
+    print(f"Umbral: {umbral}")
+    print(f"Objetos: {porcentaje_objeto:.1f}%")
+    print(f"Fondo: {porcentaje_fondo:.1f}%")
+    print(f"Intensidad objetos: {intensidad_objeto:.1f}")
+    print(f"Intensidad fondo: {intensidad_fondo:.1f}")
+    print(f"Separación: {separacion:.1f}")
+    
+    return {
+        'umbral': umbral,
+        'porcentaje_objeto': porcentaje_objeto,
+        'separacion': separacion
+    }
