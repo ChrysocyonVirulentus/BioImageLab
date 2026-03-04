@@ -730,3 +730,116 @@ def analizar_binarizacion(img, metodo):
         'porcentaje_objeto': porcentaje_objeto,
         'separacion': separacion
     }
+
+    # =============================================================================
+# EJEMPLO DE USO - ESTADISTICOS
+# =============================================================================
+
+def ejemplo_uso():
+    """
+    Ejemplo de uso del módulo de estadísticas.
+    """
+    # Simular datos de 5 imágenes con métricas morfométricas
+    np.random.seed(42)
+    
+    datos_ejemplo = {}
+    for i in range(5):
+        n_objetos = np.random.randint(50, 150)
+        datos_ejemplo[f"imagen_{i+1}"] = {
+            'area': np.random.lognormal(5, 0.5, n_objetos).tolist(),
+            'perimetro': np.random.lognormal(4, 0.4, n_objetos).tolist(),
+            'circularidad': np.random.beta(2, 5, n_objetos).tolist(),
+            'excentricidad': np.random.beta(2, 2, n_objetos).tolist(),
+            'convexidad': np.random.beta(8, 2, n_objetos).tolist(),
+        }
+    
+    # Ejecutar pipeline completo
+    resultados = pipeline_estadistico_completo(datos_ejemplo)
+    
+    print("\n=== ESTADÍSTICOS DESCRIPTIVOS ===")
+    print(resultados['descriptivos'].head())
+    
+    print("\n=== DISTRIBUCIONES ===")
+    print(resultados['distribuciones'][['mejor_distribucion', 'es_normal_95']].head())
+    
+    print("\n=== CORRELACIONES ===")
+    print(resultados['correlaciones'].round(2))
+    
+    return resultados
+
+
+if __name__ == "__main__":
+    resultado = ejemplo_uso()
+
+    # =============================================================================
+# 5. EJEMPLO DE USO - CLUSTERING
+# =============================================================================
+
+def ejemplo_uso():
+    """
+    Ejemplo completo de uso del módulo de clustering.
+    """
+    from sklearn.datasets import make_blobs
+    
+    # Generar datos sintéticos (simulando métricas de células)
+    np.random.seed(42)
+    X, y_true = make_blobs(n_samples=300, centers=4, cluster_std=1.0, random_state=42)
+    
+    # Crear DataFrame de ejemplo
+    df = pd.DataFrame({
+        'imagen': [f'celula_{i:03d}' for i in range(len(X))],
+        'grupo_exp': np.random.choice(['control', 'tratamiento'], len(X)),
+        'feature_1': X[:, 0],
+        'feature_2': X[:, 1],
+        'area': np.random.lognormal(5, 0.5, len(X)),
+    })
+    
+    print("=" * 60)
+    print("EJEMPLO: Pipeline de Clustering")
+    print("=" * 60)
+    
+    # 1. K-Means con selección automática de k
+    print("\n--- K-Means con selección automática de k ---")
+    resultado_kmeans = pipeline_clustering_completo(
+        df,
+        columnas_features=['feature_1', 'feature_2'],
+        metodo='kmeans',
+        params_clustering={'seleccionar_k_auto': True, 'selector_k': SelectorK(k_max=6)},
+        columna_id='imagen'
+    )
+    
+    print(f"\nMétricas K-Means:")
+    for k, v in resultado_kmeans['metricas'].items():
+        print(f"  {k}: {v:.4f}" if isinstance(v, float) else f"  {k}: {v}")
+    
+    # 2. DBSCAN con eps automático
+    print("\n--- DBSCAN con eps automático ---")
+    resultado_dbscan = pipeline_clustering_completo(
+        df,
+        columnas_features=['feature_1', 'feature_2'],
+        metodo='dbscan',
+        params_clustering={'calcular_eps_auto': True, 'k_vecinos': 4}
+    )
+    
+    print(f"\nMétricas DBSCAN:")
+    for k, v in resultado_dbscan['metricas'].items():
+        print(f"  {k}: {v:.4f}" if isinstance(v, float) else f"  {k}: {v}")
+    
+    # 3. Comparación de métodos
+    print("\n--- Comparación de métodos ---")
+    from sklearn.preprocessing import StandardScaler
+    X_std = StandardScaler().fit_transform(df[['feature_1', 'feature_2']].values)
+    
+    comparacion = comparar_metodos_clustering(X_std, k_min=2, k_max=5)
+    print(comparacion[['metodo', 'n_clusters', 'silhouette_score', 'parametros']])
+    
+    # Retornar DataFrames de ejemplo
+    return {
+        'df_kmeans': resultado_kmeans['dataframe'],
+        'df_dbscan': resultado_dbscan['dataframe'],
+        'comparacion': comparacion
+    }
+
+
+if __name__ == "__main__":
+    resultados = ejemplo_uso()

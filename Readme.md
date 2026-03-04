@@ -191,7 +191,7 @@ nucleo/
 │       ├── connected_components.py
 │       └── reetiquetado.py
 │
-├── transformador/                  # Rotaciones, escalado, Warp manual  
+├── transformador/                          # Rotaciones, escalado, Warp manual  
 │   ├── geometricos/ 
 │   │   └── Transfromadores_Geometricos.py  # TransformacionDistancia,  Esqueletizacion, EjeMedial, Deformar, Redimensionar, Rotacion, Remuestreo
 │   │
@@ -201,63 +201,38 @@ nucleo/
 │   └── integrales/             
 │        └── Transfromadores_Proyectivos.py # Radon, IntegralDeLinea, Hough, TransformadaDistanciaGeodesica, TransformadaHilbert, Abel
 │
-├── extractor/
-│   ├── contornos/
-│   │   ├── encontrar_contornos.py
-│   │   └── hull.py
-│   │
-│   ├── geometria/
-│   │   └── Extractor_Geometricos.py
-│   │
-│   ├── textura/
-│   │   ├── glcm.py
-│   │   ├── haralick.py
-│   │   └── lbp.py
-│   │
-│   ├── topologia/
-│   │   ├── metricas_esqueleticas.py
-│   │   └── branching.py
-│   │
-│   └── relaciones_espaciales/
-│       ├── vecinos.py
-│       └── colocalizacion.py
 │
 ├── cuantificador/
 │   ├── intensidad/
-│   │   ├── media.py
-│   │   ├── integrada.py
-│   │   ├── maximo.py
-│   │   └── perfil_lineal.py
+│   │   └── Cuantificadores_Intensidad.py # MediaIntensidad, IntensidadIntegrada, MaximoIntensidad, MinimoIntensidad, MedianaIntensidad, DesviacionEstandar, CoeficienteVariacion, PercentilIntensidad, RelacionSenialRuido, AsimetriaIntensidad, CurtosisIntensidad, PerfilLineal
 │   │
 │   ├── morfometria/
-│   │   ├── area.py
-│   │   ├── perimetro.py
-│   │   ├── dimension_fractal.py
-│   │   └── circularidad.py
+│   │   └── Cuantificadores_Morfometria.py # Geométricas básicas, Forma, Escala, Orientación, Intensidad de forma
 │   │
-│   ├── dinamica_temporal/
-│   │   ├── serie_temporales.py
-│   │   ├── tracking.py
-│   │   └── curva_bleaching.py
+│   ├── topologicos/
+│   │   └── Cuantificadores_Topologicos.py # Esqueléticas, Ramificación, Contornos, Conectividad, índice de betti, grafo de adyacencia, distancia geodésica
 │   │
-│   └── estadisticas_objetos/
-│       ├── distribuciones.py
-│       └── correlaciones.py
+│   ├── textura/
+│   │   └── Cuantificadores_Textura.py  # GLCM, CaracteristicasHaralick, LBP, FiltrosGabor, GLRLM, EnergiaLaws
+│   │
+│   └── estadisticos/
+│       └── Estadisticos.py             # Estadisticos , distribuciones, correlaciones
 │
 ├── modelador/                 
 │   ├── dimensionalidad/                 
-│   │   ├── pca.py
-│   │   ├── umap.py
-│   │   └── tsne.py
+│   │   └── Modelador_Dimensionalidad.py  # PCA, UMPA, tSNE
 │   │
 │   ├── clustering/              
-│   │   ├── kmeans.py
-│   │   └── dbscan.py
+│   │   └── Modelador_Clustering.py # KMneas, DBSCAN, HDBSCAN
 │   │
 │   ├── clasificacion/  
 │   │   ├── svm.py
 │   │   └── random_forest.py
 │   │
+│   ├── dinamica_temporal/
+│   │   ├── serie_temporales.py
+│   │   ├── tracking.py
+│   │   └── curva_bleaching.py
 │   ├── tracking/  
 │   │   └── multi_objeto.py
 │   │
@@ -269,9 +244,10 @@ nucleo/
 │
 ├── analizador/
 │   ├── plots/
-│   │   ├── histogramas.py
-│   │   ├── scatter.py
-│   │   └── boxplot.py
+│   │   ├── Estetica.py
+│   │   ├── Plots_Estadisticos.py
+│   │   ├── Plots_Imagen.py
+│   │   └── Plots_Modelos.py
 │   │
 │   ├── qc/
 │   │   ├── overlays.py
