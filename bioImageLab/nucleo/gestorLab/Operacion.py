@@ -4,67 +4,66 @@ from typing import Callable, Dict, Any, Optional, Union
 from enum import Enum
 import numpy as np
 
-from ..controlador.Resultado_Either import Resultado
+from ..controlador.Resultado_Either import Resultado, Err, Ok
 from ..controlador.Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from .Categoria_Operacion import CategoriaOperacion
 
 class TipoSalida(Enum):
-    IMAGEN = "imagen"           # Retorna BioImagenData modificada
-    MASCARA = "mascara"         # Retorna BioImagenData binaria/etiquetada
-    FEATURES = "features"       # Retorna DataFrame/dict de métricas
-    TABLA = "tabla"            # Retorna DataFrame
-    MODELO = "modelo"          # Retorna objeto entrenado
-    VISUALIZACION = "viz"      # Retorna figura/array para plot
-    NINGUNA = "ninguna"        # Side-effect (exportar archivo)
+    IMAGEN = "imagen"
+    MASCARA = "mascara"
+    FEATURES = "features"
+    TABLA = "tabla"
+    MODELO = "modelo"
+    VISUALIZACION = "viz"
+    NINGUNA = "ninguna"
 
 @dataclass(frozen=True)
 class Operacion:
     """
     Operación pura adaptada para el pipeline.
-    El callable interno viene de tus módulos específicos (ej: Filtros_Ffts.FFTPasabajo)
+    El callable interno viene de tus módulos específicos.
     """
-    nombre: str                      # "fft_pasabajo"
-    categoria: CategoriaOperacion    # FILTRACION
-    instancia_callable: Callable[[np.ndarray], np.ndarray]  # El objeto callable de tu módulo
+    nombre: str
+    categoria: CategoriaOperacion
+    instancia_callable: Callable[[BioImagenData, int], Resultado[BioImagenData, ErrorBioImagen]]
     canal_objetivo: Optional[int] = None
     
-    # Metadatos
     parametros_originales: Dict[str, Any] = field(default_factory=dict)
     tipo_salida: TipoSalida = TipoSalida.IMAGEN
     descripcion: str = ""
-    es_operacion_split: bool = False  # Marca si esta op genera una bifurcación
-    requiere_input_especial: Optional[str] = None  # "mascara", "imagen_original", etc.
+    es_operacion_split: bool = False
+    requiere_input_especial: Optional[str] = None
     
     def ejecutar(self, data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
-        from dataclasses import replace
-        
+        """
+        Ejecuta la operación sobre el BioImagenData completo.
+        El callable recibe (BioImagenData, canal_idx) y retorna Resultado.
+        """
         try:
-            T, Z, C, Y, X = data.dims.shape
-            canales = [self.canal_objetivo] if self.canal_objetivo is not None else range(C)
+            # Determinar qué canal procesar
+            if self.canal_objetivo is not None:
+                if not (0 <= self.canal_objetivo < data.dims.C):
+                    return Err(ErrorBioImagen(
+                        etapa="operacion",
+                        mensaje=f"{self.nombre}: canal {self.canal_objetivo} fuera de rango [0, {data.dims.C-1}]"
+                    ))
+                canales = [self.canal_objetivo]
+            else:
+                canales = range(data.dims.C)
             
-            if self.canal_objetivo is not None and not (0 <= self.canal_objetivo < C):
-                return Err(ErrorBioImagen(
-                    etapa="operacion",
-                    mensaje=f"{self.nombre}: canal {self.canal_objetivo} fuera de rango [0, {C-1}]"
-                ))
-            
-            nuevos_datos = data.datos.copy().astype(np.float64)
+            # Aplicar operación canal por canal usando el callable
+            resultado_actual: Resultado[BioImagenData, ErrorBioImagen] = Ok(data)
             
             for c in canales:
-                for t in range(T):
-                    for z in range(Z):
-                        corte = data.datos[t, z, c, :, :]
-                        resultado = self.instancia_callable(corte)
-                        
-                        if resultado.shape != (Y, X):
-                            return Err(ErrorBioImagen(
-                                etapa="operacion",
-                                mensaje=f"{self.nombre} cambió shape: {(Y,X)} -> {resultado.shape}"
-                            ))
-                        
-                        nuevos_datos[t, z, c, :, :] = resultado
+                # El callable recibe BioImagenData y retorna Resultado[BioImagenData, ErrorBioImagen]
+                resultado_canal = self.instancia_callable(resultado_actual.unwrap(), c)
+                
+                if resultado_canal.es_err():
+                    return resultado_canal  # Propagar error
+                    
+                resultado_actual = resultado_canal
             
-            return Ok(replace(data, datos=nuevos_datos))
+            return resultado_actual
             
         except Exception as e:
             return Err(ErrorBioImagen(
@@ -74,6 +73,6 @@ class Operacion:
             ))
     
     def __repr__(self) -> str:
-        canal = f"[C{self.canal_objetivo}]" if self.canal_objetivo else "[C*]"
+        canal = f"[C{self.canal_objetivo}]" if self.canal_objetivo is not None else "[C*]"
         split = " [SPLIT]" if self.es_operacion_split else ""
         return f"{self.categoria.name}::{self.nombre}{canal}{split}"

@@ -252,11 +252,10 @@ class Controlador_Segmentador:
     
     def crear_otsu(
         self,
-        nbins: int = 256,
         tipo_aplicacion: TipoSegmentacion = Segmentacion_PorCorteEspaciotemporal()
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
         """Otsu: Umbral automático por maximización de varianza entre clases."""
-        metodo = Otsu(nbins=nbins)
+        metodo = Otsu()
         self._ultimo_metodo = metodo
         return crear_segmentacion(metodo, tipo_aplicacion)
     

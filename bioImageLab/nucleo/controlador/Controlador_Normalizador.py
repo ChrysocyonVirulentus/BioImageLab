@@ -252,23 +252,20 @@ class Normalizador:
 def operacion_normalizacion(
     tipo: TipoNormalizacion = Norm_Global(),
     metodo: MetodoNormalizacion = MaxNorm(),
-    canal: int = 0
+    canal: int = 0,
+    nombre: str = ""
 ) -> Operacion:
-    """
-    Crea una Operación de preprocesamiento lista para insertar en PipelineBuilder.
-    
-    Uso:
-        pipeline = (
-            PipelineBuilder()
-            .preprocesar("norm_max_global", operacion_normalizacion(Norm_Global(), MaxNorm()))
-            .filtrar(...)
-            .construir()
-        )
-    """
+
     normalizador = crear_normalizador(tipo, metodo)
-    
+
     return Operacion(
-        nombre=f"normalizacion_{metodo.nombre}_{tipo.__class__.__name__}",
+        nombre=nombre or f"normalizacion_{metodo.nombre}_{tipo.__class__.__name__}",
         categoria=CategoriaOperacion.PREPROCESAMIENTO,
-        funcion=lambda data: normalizador(data, canal)
+        instancia_callable=normalizador,
+        canal_objetivo=canal,
+        parametros_originales={
+            "tipo": tipo.__class__.__name__,
+            "metodo": metodo.nombre,
+            "canal": canal
+        }
     )

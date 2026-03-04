@@ -107,26 +107,23 @@ MetodoFiltro = Union[
 def crear_filtro(
     metodo: MetodoFiltro,
     tipo: TipoFiltro = Filtro_Global(),
-    canal: int = 0
-) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
+) -> Callable[[BioImagenData, int], Resultado[BioImagenData, ErrorBioImagen]]:
     """
     Factory curried que retorna función pura de filtrado.
     
-    Args:
-        metodo: Instancia del filtro específico (ej: Gaussiano(sigma=2.0))
-        tipo: Estrategia de aplicación espacio-temporal
-        canal: Canal objetivo (None = todos, pero aquí específico por simplicidad)
-    
-    Returns:
-        Callable para usar con .bind() en pipelines
+    FIRMA CORREGIDA: (BioImagenData, canal_idx) -> Resultado[BioImagenData, ErrorBioImagen]
+    Igual que crear_normalizador para compatibilidad con Operacion.ejecutar()
     """
-    def _aplicar_filtro(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
+    def _aplicar_filtro(
+        data: BioImagenData, 
+        canal_idx: int = 0
+    ) -> Resultado[BioImagenData, ErrorBioImagen]:
         
         # Validación de canal
-        if not (0 <= canal < data.dims.C):
+        if not (0 <= canal_idx < data.dims.C):
             return Err(ErrorBioImagen(
                 etapa="filtracion",
-                mensaje=f"Canal {canal} fuera de rango [0, {data.dims.C-1}]",
+                mensaje=f"Canal {canal_idx} fuera de rango [0, {data.dims.C-1}]",
                 ruta=data.ruta_origen
             ))
         
@@ -134,7 +131,7 @@ def crear_filtro(
             T, Z, C, Y, X = data.dims.shape
             
             # Extraer canal objetivo [T, Z, Y, X]
-            canal_data = data.datos[:, :, canal, :, :]
+            canal_data = data.datos[:, :, canal_idx, :, :]
             
             # Array resultado manteniendo estructura 5D
             resultado_canal = np.zeros((T, Z, 1, Y, X), dtype=np.float64)
@@ -142,32 +139,28 @@ def crear_filtro(
             # Aplicar según estrategia
             match tipo:
                 case Filtro_Global():
-                    # Aplicar a todo el volumen como una secuencia 2D continua
                     for t in range(T):
                         for z in range(Z):
                             resultado_canal[t, z, 0, :, :] = metodo(canal_data[t, z, :, :])
                             
                 case Filtro_PorCorteZ():
-                    # Cada Z independiente (procesa todo T para cada Z)
                     for z in range(Z):
                         for t in range(T):
                             resultado_canal[t, z, 0, :, :] = metodo(canal_data[t, z, :, :])
                             
                 case Filtro_PorTimepoint():
-                    # Cada T independiente (procesa todo Z para cada T)
                     for t in range(T):
                         for z in range(Z):
                             resultado_canal[t, z, 0, :, :] = metodo(canal_data[t, z, :, :])
                             
                 case Filtro_PorCorteEspaciotemporal():
-                    # Máxima granularidad: cada (t,z) independiente
                     for t in range(T):
                         for z in range(Z):
                             resultado_canal[t, z, 0, :, :] = metodo(canal_data[t, z, :, :])
             
             # Reconstruir BioImagenData
             nuevos_datos = data.datos.copy().astype(np.float64)
-            nuevos_datos[:, :, canal, :, :] = resultado_canal[:, :, 0, :, :]
+            nuevos_datos[:, :, canal_idx, :, :] = resultado_canal[:, :, 0, :, :]
             
             return Ok(replace(data, datos=nuevos_datos))
             
@@ -194,8 +187,10 @@ def crear_filtro_multicanal(
         resultado: Resultado[BioImagenData, ErrorBioImagen] = Ok(data)
         
         for c in range(data.dims.C):
-            filtro_canal = crear_filtro(metodo, tipo, canal=c)
-            resultado = resultado.bind(filtro_canal)
+            # crear_filtro ahora retorna callable(BioImagenData, int)
+            filtro_canal = crear_filtro(metodo, tipo)
+            # Usar bind con lambda que pasa el canal
+            resultado = resultado.bind(lambda d, canal=c: filtro_canal(d, canal))
             if resultado.es_err():
                 break
         
@@ -209,7 +204,6 @@ def crear_filtro_multicanal(
 class Controlador_Filtrador:
     """
     Wrapper stateful para filtrado.
-    Permite crear filtros configurados y aplicarlos.
     """
     
     def __init__(self):
@@ -217,172 +211,188 @@ class Controlador_Filtrador:
         self._ultimo_filtro: Optional[MetodoFiltro] = None
     
     # ===== MÉTODOS FACTORY POR DOMINIO =====
+    # Todos retornan Callable[[BioImagenData], Resultado[...]] para compatibilidad
+    # o Callable[[BioImagenData, int], Resultado[...]] según necesidad
     
-    # --- Espaciales ---
     def crear_gaussiano(
         self, 
         sigma: float = 1.0,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
         """Crea filtro gaussiano espacial."""
         metodo = Gaussiano(sigma=sigma)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        # Usar crear_filtro que retorna callable(BioImagenData, int)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        # Currying: fijar el canal
+        return lambda data: filtro(data, canal)
     
     def crear_mediana(
         self,
         tamano: int = 3,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro de mediana."""
         metodo = Mediana(tamano=tamano)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_bilateral(
         self,
         sigma_color: float = 0.1,
         sigma_spatial: float = 2.0,
-        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal()
+        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro bilateral (preserva bordes)."""
         metodo = Bilateral(sigma_color=sigma_color, sigma_spatial=sigma_spatial)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_difusion_anisotropica(
         self,
         iteraciones: int = 10,
         kappa: float = 50.0,
         gamma: float = 0.1,
-        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal()
+        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro de difusión anisotrópica (preserva bordes fuertes)."""
         metodo = DifusionAnisotropica(iteraciones=iteraciones, kappa=kappa, gamma=gamma)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
-    # --- Espectrales (FFT) ---
     def crear_pasabajo(
         self,
         radio: int = 30,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro pasa-bajo en frecuencia (suavizado)."""
-        metodo = FFTPasabajo(radio=radio)
+        metodo = FFTPasaBajo(radio=radio)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_pasaalto(
         self,
         radio: int = 30,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro pasa-alto en frecuencia (detección de bordes/finos)."""
-        metodo = FFTPasaalto(radio=radio)
+        metodo = FFTPasaAlto(radio=radio)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_pasa_banda(
         self,
         radio_bajo: int = 10,
         radio_alto: int = 50,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro pasa-banda (rechaza frecuencias muy bajas y muy altas)."""
         metodo = FFTPasaBanda(radio_bajo=radio_bajo, radio_alto=radio_alto)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_bandstop(
         self,
         frecuencia_central: float = 0.25,
         ancho_banda: float = 0.05,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro rechaza-banda (elimina frecuencia específica, ej: ruido periódico)."""
         metodo = FFTBandStop(frecuencia_central=frecuencia_central, ancho_banda=ancho_banda)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_notch(
         self,
         frecuencias_eliminar: list[tuple[float, float]],
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro notch (elimina frecuencias puntuales, ej: artefactos de cuadrícula)."""
         metodo = FiltradoNotch(frecuencias_eliminar=frecuencias_eliminar)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
-    # --- Multiescala ---
     def crear_diferencia_gaussiana(
         self,
         sigma1: float = 1.0,
         sigma2: float = 2.0,
-        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal()
+        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea DoG (detección de blobs por diferencia de escalas)."""
         metodo = DiferenciaGaussiana(sigma1=sigma1, sigma2=sigma2)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_laplaciano(
         self,
         tipo: str = "discreto",
-        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal()
+        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro Laplaciano (detección de puntos de inflexión)."""
         metodo = DiferenciaLaplaciana(tipo=tipo)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_wavelet(
         self,
         wavelet: str = 'db4',
         niveles: int = 3,
         umbral: float = 0.1,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro wavelet (denoising multiescala)."""
         metodo = WaveletTransform(wavelet=wavelet, niveles=niveles, umbral=umbral)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_piramide_laplaciana(
         self,
         niveles: int = 3,
-        tipo_aplicacion: TipoFiltro = Filtro_Global()
+        tipo_aplicacion: TipoFiltro = Filtro_Global(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea pirámide Laplaciana (representación multiescala reconstruible)."""
         metodo = PiramideLaplaciana(niveles=niveles)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
-    # --- No locales ---
     def crear_nl_means(
         self,
         h: float = 0.1,
         tamano_patch: int = 7,
         tamano_busqueda: int = 21,
-        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal()
+        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea filtro Non-Local Means (preserva texturas mientras reduce ruido)."""
         metodo = NonLocalMedians(h=h, tamano_patch=tamano_patch, tamano_busqueda=tamano_busqueda)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
     def crear_bm3d(
         self,
         sigma: float = 25.0,
-        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal()
+        tipo_aplicacion: TipoFiltro = Filtro_PorCorteEspaciotemporal(),
+        canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """Crea BM3D (Block-Matching 3D, state-of-the-art denoising)."""
         metodo = BlockMatching3D(sigma=sigma)
         self._ultimo_filtro = metodo
-        return crear_filtro(metodo, tipo_aplicacion)
+        filtro = crear_filtro(metodo, tipo_aplicacion)
+        return lambda data: filtro(data, canal)
     
-    # ===== MÉTODOS DE APLICACIÓN DIRECTA (compatibilidad) =====
+    # ===== MÉTODOS DE APLICACIÓN DIRECTA =====
     
     def aplicar(
         self,
@@ -392,8 +402,8 @@ class Controlador_Filtrador:
         canal: int = 0
     ) -> Resultado[BioImagenData, ErrorBioImagen]:
         """Aplica filtro específico a datos (versión imperativa)."""
-        filtro = crear_filtro(metodo, tipo, canal)
-        return filtro(data)
+        filtro = crear_filtro(metodo, tipo)
+        return filtro(data, canal)
     
     def aplicar_multicanal(
         self,
@@ -406,7 +416,6 @@ class Controlador_Filtrador:
         return filtro(data)
     
     def reset(self):
-        """Limpia caché interno."""
         self._cache = None
         self._ultimo_filtro = None
     
@@ -426,22 +435,17 @@ def operacion_filtro(
     """
     Crea Operación de filtración lista para PipelineBuilder.
     
-    Uso:
-        pipeline = (
-            PipelineBuilder()
-            .filtrar("gaussiano_suavizado", 
-                operacion_filtro(Gaussiano(sigma=2.0), Filtro_Global(), canal=0))
-            .filtrar("pasaalto_bordes",
-                operacion_filtro(FFTPasaalto(radio=40), Filtro_Global(), canal=0))
-            .construir()
-        )
+    CORREGIDO: Ahora usa crear_filtro que retorna callable(BioImagenData, int)
     """
     nombre_op = nombre or f"filtrado_{metodo.__class__.__name__}_{tipo.__class__.__name__}"
+    
+    # CORRECCIÓN CLAVE: Usar crear_filtro que tiene firma (BioImagenData, int) -> Resultado
+    filtro_callable = crear_filtro(metodo, tipo)
     
     return Operacion(
         nombre=nombre_op,
         categoria=CategoriaOperacion.FILTRACION,
-        instancia_callable=metodo,  # El método ya es callable
+        instancia_callable=filtro_callable,  # Ahora es callable(data, canal) -> Resultado
         canal_objetivo=canal,
         parametros_originales={
             "metodo": metodo.__class__.__name__,
@@ -454,53 +458,42 @@ def operacion_filtro(
 
 def _extraer_parametros(metodo: MetodoFiltro) -> Dict[str, Any]:
     """Extrae parámetros del método para metadata."""
-    # Asume que los métodos tienen atributos públicos documentados
     params = {}
-    for attr in ['sigma', 'radio', 'tamano', 'iteraciones', 'h', 'wavelet', 'niveles']:
+    for attr in ['sigma', 'radio', 'tamano', 'iteraciones', 'h', 'wavelet', 'niveles', 
+                 'radio_bajo', 'radio_alto', 'frecuencia_central', 'ancho_banda']:
         if hasattr(metodo, attr):
             params[attr] = getattr(metodo, attr)
     return params
 
 
-# Factory conveniente desde Controlador_Filtrador
+# Factory desde controlador (opcional, para compatibilidad)
 def operacion_filtro_desde_controlador(
     controlador: Controlador_Filtrador,
-    metodo_factory: str,  # nombre del método: "crear_gaussiano", "crear_pasaalto", etc.
+    nombre_metodo: str,
     params: Dict[str, Any],
     canal: int = 0
 ) -> Resultado[Operacion, ErrorBioImagen]:
     """
-    Crea operación usando el controlador (valida que el método exista).
-    
-    Uso:
-        filtrador = Controlador_Filtrador()
-        op_result = operacion_filtro_desde_controlador(
-            filtrador, "crear_gaussiano", {"sigma": 2.0}, canal=0)
-        if op_result.es_ok():
-            builder.filtrar("mi_filtro", op_result.unwrap())
+    Crea operación usando método del controlador.
     """
     try:
-        if not hasattr(controlador, metodo_factory):
+        if not hasattr(controlador, nombre_metodo):
             return Err(ErrorBioImagen(
                 etapa="configuracion",
-                mensaje=f"Controlador_Filtrador no tiene método '{metodo_factory}'"
+                mensaje=f"Método '{nombre_metodo}' no existe en Controlador_Filtrador"
             ))
         
-        factory = getattr(controlador, metodo_factory)
-        filtro_callable = factory(**params)  # Esto retorna el callable curried
+        factory = getattr(controlador, nombre_metodo)
+        # Llamar factory para obtener el callable curried
+        filtro_callable = factory(**params, canal=canal)
         
-        # Extraer nombre del método para la operación
-        nombre_op = metodo_factory.replace("crear_", "")
-        
-        # Crear operación con callable interno
-        # Necesitamos "desenvolver" el callable para obtener el metodo subyacente
-        # Esto es un poco hacky pero funciona para el registro
+        # Extraer método subyacente para metadata
         metodo_subyacente = controlador._ultimo_filtro
         
         return Ok(Operacion(
-            nombre=nombre_op,
+            nombre=nombre_metodo.replace("crear_", ""),
             categoria=CategoriaOperacion.FILTRACION,
-            instancia_callable=metodo_subyacente,
+            instancia_callable=lambda data, c=canal: filtro_callable(data),  # Adaptador
             canal_objetivo=canal,
             parametros_originales=params,
             tipo_salida=TipoSalida.IMAGEN
@@ -509,6 +502,6 @@ def operacion_filtro_desde_controlador(
     except Exception as e:
         return Err(ErrorBioImagen(
             etapa="configuracion",
-            mensaje=f"Error creando operación desde controlador: {str(e)}",
+            mensaje=f"Error: {str(e)}",
             causa=e
         ))

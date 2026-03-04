@@ -191,7 +191,12 @@ class PipelineBuilder:
                 f"{validacion_final.resumen()}"
             )
         
-        return Pipeline(tuple(self._operaciones), validacion_final)
+        # CORRECCIÓN: Crear Pipeline solo con nombre y operaciones
+        # No pasar validacion_final como argumento
+        return Pipeline(
+            nombre="pipeline_construido",
+            operaciones=tuple(self._operaciones)
+        )
     
     def construir_desde_operaciones(self, operaciones: List[Operacion]) -> Pipeline:
         """Reconstruye desde lista (usado por FlujoProcesamiento)"""

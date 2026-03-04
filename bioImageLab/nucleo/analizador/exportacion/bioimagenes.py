@@ -40,7 +40,7 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from Estetica import EsteticaGrafico, ESTILOS_PREDEFINIDOS
+from ..plots.Estetica import EsteticaGrafico, ESTILOS_PREDEFINIDOS
 
 _EST_DEFAULT = EsteticaGrafico(
     figsize=(6, 5),
