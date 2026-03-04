@@ -364,7 +364,7 @@ class PiramideLaplaciana(FiltroMultiescala):
         return img_reconstruida
 
 
-class Wavelet(FiltroMultiescala):
+class WaveletTransform(FiltroMultiescala):
     """
         Transformada Wavelet para análisis tiempo-frecuencia multiescala.
         

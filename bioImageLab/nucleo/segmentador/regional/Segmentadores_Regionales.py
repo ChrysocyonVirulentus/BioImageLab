@@ -33,8 +33,8 @@ Métodos disponibles:
 - CorteGrafico: Minimización de energía mediante corte mínimo en grafo
 - SuperpixelSLIC: Superpíxeles compactos y homogéneos (Simple Linear Iterative Clustering)
 - SuperpixelFelzenszwalb: Superpíxeles basados en partición de grafos
-- WatershedMarcas: Watershed como segmentador regional (variante sin máscara binaria)
-- MeanShift: Segmentación por modo de densidad (clustering espacial-color)
+- WatershedRegiones: Watershed como segmentador regional (variante sin máscara binaria)
+- MeanShiftSegmentacion: Segmentación por modo de densidad (clustering espacial-color)
 """
 
 import numpy as np
@@ -44,7 +44,6 @@ from scipy import ndimage
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from skimage import segmentation, color, filters, graph
-from skimage.future import graph as graph_future
 from sklearn.cluster import MeanShift as SklearnMeanShift
 import warnings
 
@@ -590,7 +589,7 @@ class CorteGrafico(SegmentadorRegional):
         superpixels = slic(img, n_segments=n_segments, compactness=30)
         
         # Construir grafo de regiones (RAG)
-        g = graph_future.rag_mean_color(img, superpixels, mode='similarity')
+        g = graph.rag_mean_color(img, superpixels, mode='similarity')
         
         # Si hay semillas, incorporarlas como constraints
         if semillas is not None:
@@ -603,7 +602,7 @@ class CorteGrafico(SegmentadorRegional):
                     pass  # Implementación específica depende de librería
         
         # Corte normalizado (aproximación a min-cut)
-        etiquetas_sp = graph_future.cut_normalized(superpixels, g)
+        etiquetas_sp = graph.cut_normalized(superpixels, g)
         
         # Expandir a píxeles
         from skimage.segmentation import relabel_sequential
@@ -625,10 +624,10 @@ class CorteGrafico(SegmentadorRegional):
         n_segments = min(1000, img.shape[0] * img.shape[1] // 50)
         superpixels = slic(img, n_segments=n_segments, compactness=20)
         
-        g = graph_future.rag_mean_color(img, superpixels, mode='similarity')
+        g = graph.rag_mean_color(img, superpixels, mode='similarity')
         
         # Corte en n regiones
-        etiquetas_sp = graph_future.cut_threshold(superpixels, g, thresh=0.2)
+        etiquetas_sp = graph.cut_threshold(superpixels, g, thresh=0.2)
         
         # Re-etiquetar para tener exactamente n regiones (aproximación)
         from skimage.segmentation import relabel_sequential

@@ -113,7 +113,7 @@ nucleo/
 │   │   ├── normalizador.py               # Handler de la normalizacion : por el metodo y por el corte confocal.
 │   │   └── metodosNormalizacion.py       # Metodos zscore, max, mim_max, y por percentil.
 │   │
-│   └── corrector/                        # Cada uno con dos metodos : el real con imagenes de referencia, y el estimado (usando filtros, realzadores o modelado).
+│   └── corrector/                        # ATENCION : NO IMPLEMENTADO TODAVIA
 │          ├── iluminacion/
 │          │    ├── flat_field.py 
 │          │    ├── correccion_fondo.py 
@@ -143,7 +143,7 @@ nucleo/
 │   ├── multiescala/                      # Dominio Multiescala
 │   │   └── Filtros_Multiescala.py        # Diferencia Laplaciana, Diferencia Gaussiana, Wavelets, PiramideLaplaciana
 │   │
-│   ├── variacionales/                    
+│   ├── variacionales/                    # ATENCION : NO IMPLEMENTADO TODAVIA
 │   │   └── total_variacion.py
 │   │
 │   └── noLocales/                      # Dominio No local
@@ -181,13 +181,13 @@ nucleo/
 │   │   └── Segmentadores_Instanciales.py     # Watershed, WatershedMarcado, DistanciaWatershed, SplitDistancial, WatershedHibrido, SplitWatershed
 │   │
 │   ├── regional/
-│   │   └── Segmentaodores_Regioneales.py     # RegionGrowing, RandomWalk, CorteGrafico, SuperpixelSLIC, SuperpixelFelzenszwalb, WatershedMarcas, MeanShift
+│   │   └── Segmentaodores_Regioneales.py     # RegionGrowing, RandomWalk, CorteGrafico, SuperpixelSLIC, SuperpixelFelzenszwalb, WatershedRegiones, MeanShiftSegmentacion
 │   │
-│   ├── contornos_activos/
+│   ├── contornos_activos/  # ATENCION : NO IMPLEMENTADO TODAVIA
 │   │   ├── serpientes.py
 │   │   └── conjuntos_nivel.py
 │   │
-│   └── etiquetado/
+│   └── etiquetado/         # ATENCION : NO IMPLEMENTADO TODAVIA
 │       ├── connected_components.py
 │       └── reetiquetado.py
 │
@@ -226,17 +226,16 @@ nucleo/
 │   │   └── Modelador_Clustering.py # KMneas, DBSCAN, HDBSCAN
 │   │
 │   ├── clasificacion/  
-│   │   ├── svm.py
-│   │   └── random_forest.py
+│   │   └── Modelador_Clasificacion.py # SVM, RegresionLogistica, RandomForest
 │   │
-│   ├── dinamica_temporal/
+│   ├── dinamica_temporal/              # ATENCION : NO IMPLEMENTADO TODAVIA
 │   │   ├── serie_temporales.py
 │   │   ├── tracking.py
 │   │   └── curva_bleaching.py
-│   ├── tracking/  
+│   ├── tracking/                       # ATENCION : NO IMPLEMENTADO TODAVIA
 │   │   └── multi_objeto.py
 │   │
-│   └── ajuste/  
+│   └── ajuste/                 # ATENCION : NO IMPLEMENTADO TODAVIA
 │       ├── ajuste_superficie.py
 │       └── ajuste_psf.py
 │
@@ -249,7 +248,7 @@ nucleo/
 │   │   ├── Plots_Imagen.py
 │   │   └── Plots_Modelos.py
 │   │
-│   ├── qc/
+│   ├── qc/                     # ATENCION : NO IMPLEMENTADO TODAVIA
 │   │   ├── overlays.py
 │   │   └── sanity_checks.py
 │   │
@@ -259,12 +258,12 @@ nucleo/
 │       └── figures.py
 │
 └── gestorLab/
-    ├── pipelinesClasicos/
-    │   ├── nuclei_fluorescence.yaml
-    │   └── spots_detection.yaml
-    │
-    ├── personalizados/
-    └── validacion/
+    ├── Categoria_Operacion.py
+    ├── Operacion.py
+    ├── Flujo_PRocesameinto.py
+    ├── Pipeline.py
+    ├── Pipeline_Builder.py
+    └── Gestor_Ramas.py
 ```
 
 ```bash

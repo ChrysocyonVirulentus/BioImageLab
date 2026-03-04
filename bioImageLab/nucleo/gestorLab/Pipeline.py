@@ -1,73 +1,82 @@
-# === nucleo/pipeline/Pipeline.py ===
-from dataclasses import dataclass
-from typing import Tuple, List, Callable, Optional
-from nucleo.controlador.Resultado_Either import Resultado, Ok, Err, ErrorBioImagen, BioImagenData
-from .Operacion import Operacion
+# === gestorLab/Pipeline.py ===
+from dataclasses import dataclass, field
+from typing import Tuple, List, Callable, Optional, Dict, Any
+from enum import Enum
+
+from ..controlador.Resultado_Either import Resultado, Ok, Err 
+from ..controlador.Controlador_BioImagen import BioImagenData, ErrorBioImagen
+from .Operacion import Operacion, TipoSalida
+from .Categoria_Operacion import CategoriaOperacion, RequisitoRama
+
+class EstadoRama(Enum):
+    ACTIVA = "activa"           # Ejecutando normalmente
+    BLOQUEADA = "bloqueada"     # Esperando merge con otra rama
+    COMPLETADA = "completada"   # Finalizó, tiene resultado
+    ERROR = "error"             # Falló ejecución
+
+@dataclass
+class ContextoRama:
+    """
+    Estado de una rama de procesamiento.
+    Las ramas mantienen su propio historial y pueden esperar datos de otras.
+    """
+    nombre: str  # "principal", "segmentada", "cuantificacion_intensidad"
+    operaciones_pendientes: Tuple[Operacion, ...]
+    data_actual: Optional[BioImagenData] = None
+    estado: EstadoRama = EstadoRama.ACTIVA
+    dependencias_requeridas: Dict[str, Any] = field(default_factory=dict)  # Lo que necesita de otras ramas
+    resultados_intermedios: Dict[str, Any] = field(default_factory=dict)   # Lo que exporta para otras ramas
+    
+    def puede_continuar(self) -> bool:
+        """Verifica si todas las dependencias están satisfechas"""
+        return self.estado == EstadoRama.ACTIVA and not self.dependencias_requeridas
 
 @dataclass(frozen=True)
 class Pipeline:
     """
-    Secuencia inmutable de operaciones adaptadas.
-    Cada operación contiene su instancia callable lista para ejecutar.
+    Pipeline que puede contener operaciones de bifurcación.
+    No ejecuta directamente, solo define la secuencia.
     """
+    nombre: str
     operaciones: Tuple[Operacion, ...]
+    puntos_split: Tuple[int, ...] = field(default_factory=tuple)  # Índices donde ocurren splits
     
-    def ejecutar(
-        self, 
-        data: BioImagenData,
-        callback_progreso: Optional[Callable[[int, Operacion, BioImagenData], None]] = None
-    ) -> Resultado[BioImagenData, ErrorBioImagen]:
-        """
-        Ejecuta pipeline secuencial. Fail-fast en primer error.
-        """
-        resultado: Resultado[BioImagenData, ErrorBioImagen] = Ok(data)
-        
-        for i, op in enumerate(self.operaciones):
-            if resultado.es_err():
-                break
-            
-            # Ejecutar operación (ya contiene su instancia callable)
-            resultado = resultado.bind(op.ejecutar)
-            
-            if callback_progreso and resultado.es_ok():
-                callback_progreso(i, op, resultado.unwrap())
-        
-        return resultado
+    def __post_init__(self):
+        # Detectar automáticamente splits
+        splits = tuple(
+            i for i, op in enumerate(self.operaciones) 
+            if op.es_operacion_split or op.categoria.es_punto_split
+        )
+        object.__setattr__(self, 'puntos_split', splits)
     
-    def ejecutar_con_snapshots(
-        self,
-        data: BioImagenData
-    ) -> Tuple[Resultado[BioImagenData, ErrorBioImagen], List[Tuple[int, str, BioImagenData]]]:
+    def obtener_ramas_implicitas(self) -> List['Pipeline']:
         """
-        Ejecuta guardando copia después de cada operación (para debug).
+        Si este pipeline tiene splits, retorna los sub-pipelines por rama.
         """
-        snapshots: List[Tuple[int, str, BioImagenData]] = []
-        resultado: Resultado[BioImagenData, ErrorBioImagen] = Ok(data)
+        if not self.puntos_split:
+            return [self]
         
-        for i, op in enumerate(self.operaciones):
-            if resultado.es_err():
-                break
-            
-            # Snapshot antes
-            if resultado.es_ok():
-                snapshots.append((i, f"antes_{op.nombre}", resultado.unwrap()))
-            
-            # Ejecutar
-            resultado = resultado.bind(op.ejecutar)
-            
-            # Snapshot después
-            if resultado.es_ok():
-                snapshots.append((i, f"despues_{op.nombre}", resultado.unwrap()))
+        # Lógica para dividir en ramas...
+        ramas = []
+        inicio = 0
         
-        return resultado, snapshots
-    
-    def __or__(self, otro: 'Pipeline') -> 'Pipeline':
-        """Concatenación de pipelines"""
-        return Pipeline(self.operaciones + otro.operaciones)
+        for split_idx in self.puntos_split:
+            # Rama hasta el split
+            rama_principal = Pipeline(
+                f"{self.nombre}_hasta_split_{split_idx}",
+                self.operaciones[inicio:split_idx+1]
+            )
+            ramas.append(rama_principal)
+            
+            # Ramas divergentes después del split
+            # Esto requiere análisis de las operaciones post-split
+            # para determinar cuántas ramas hay (ej: procesada vs segmentada)
+            
+        return ramas
     
     def __len__(self) -> int:
         return len(self.operaciones)
     
     def __repr__(self) -> str:
-        ops = " → ".join(str(op) for op in self.operaciones)
-        return f"Pipeline[{len(self)}: {ops}]"
+        splits = f" [splits: {self.puntos_split}]" if self.puntos_split else ""
+        return f"Pipeline({self.nombre})[{len(self)} ops]{splits}"

@@ -97,7 +97,7 @@ class FiltroEspectral:
         return img_resultado.astype(img.dtype)
 
 
-class FFTPasabajo(FiltroEspectral):
+class FFTPasaBajo(FiltroEspectral):
     """
         Filtro pasabajo (low-pass) gaussiano en el dominio de frecuencias.
         
@@ -142,7 +142,7 @@ class FFTPasabajo(FiltroEspectral):
         return np.exp(-(x**2 + y**2) / (2 * self.radio**2))
 
 
-class FFTPasaalto(FiltroEspectral):
+class FFTPasaAlto(FiltroEspectral):
     """
         Filtro pasaalto (high-pass) gaussiano en el dominio de frecuencias.
         
@@ -188,7 +188,7 @@ class FFTPasaalto(FiltroEspectral):
         return 1 - np.exp(-(x**2 + y**2) / (2 * self.radio**2))
 
 
-class FFTPasabanda(FiltroEspectral):
+class FFTPasaBanda(FiltroEspectral):
     """
         Filtro pasabanda (band-pass) en el dominio de frecuencias.
         
@@ -244,7 +244,7 @@ class FFTPasabanda(FiltroEspectral):
         return mascara_alta - mascara_baja
 
 
-class FFTBandstop(FiltroEspectral):
+class FFTBandStop(FiltroEspectral):
     """
         Filtro rechaza-banda (band-stop/notch) en el dominio de frecuencias.
         

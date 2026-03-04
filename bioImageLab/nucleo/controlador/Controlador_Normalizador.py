@@ -5,20 +5,20 @@ from typing import Union, Callable, Optional, Tuple
 from enum import Enum, auto
 
 # Imports de tu sistema
-from Metodos_Normalizacion import (
+from ..preprocesador.normalizador.Metodos_Normalizacion import (
     MetodoNormalizacion, 
     MaxNorm, 
     MinMaxNorm, 
     PercentilNorm, 
     ZScoreNorm
 )
-from nucleo.controlador.Resultado_Either import Resultado, Err, Ok
-from nucleo.controlador.controladorBioImagen import (
+from .Resultado_Either import Resultado, Err, Ok
+from .Controlador_BioImagen import (
     BioImagenData, 
-    ErrorBioImagen,
-    CategoriaOperacion,
-    Operacion
+    ErrorBioImagen
 )
+from ..gestorLab.Categoria_Operacion import CategoriaOperacion
+from ..gestorLab.Operacion import Operacion
 
 # ESTRATEGIAS DE NORMALIZACIÓN (Tipos Algebraicos)
 

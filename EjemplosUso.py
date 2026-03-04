@@ -843,3 +843,56 @@ def ejemplo_uso():
 
 if __name__ == "__main__":
     resultados = ejemplo_uso()
+
+'''
+pipeline:
+  - operacion: normalizacion_global
+    parametros: { metodo: max }
+  
+  - operacion: fft_pasabajo
+    parametros: { radio: 30 }
+  
+  - operacion: unsharp_mask
+    parametros: { cantidad: 1.5 }
+  
+  - operacion: otsu_segmentacion  # ← Detectado como punto de split implícito
+  
+  - operacion: cuantificar_morfometria  # ← Requiere merge de imagen + máscara
+
+ramas:
+  base:
+    nombre: "Preparación común"
+    tipo: LINEAL
+    operaciones:
+      - operacion: normalizacion_global
+      - operacion: fft_pasabajo
+        parametros: { radio: 25 }
+    exporta_para: [procesada, segmentada]
+
+  procesada:
+    nombre: "Imagen filtrada para intensidad"
+    tipo: DIVERGENTE
+    requiere: [base]
+    operaciones:
+      - operacion: realce_adaptativo
+    exporta_para: [cuantificacion]
+
+  segmentada:
+    nombre: "Máscara de segmentación"
+    tipo: DIVERGENTE
+    requiere: [base]
+    operaciones:
+      - operacion: otsu_segmentacion
+      - operacion: watershed_marcado
+    exporta_para: [cuantificacion]
+
+  cuantificacion:
+    nombre: "Cuantificación combinada"
+    tipo: CONVERGENTE
+    requiere: [procesada, segmentada]
+    operaciones:
+      - operacion: cuantificar_fluorescencia  # Usa imagen de 'procesada' + máscara de 'segmentada'
+      - operacion: cuantificar_morfometria
+
+rama_salida: cuantificacion
+'''

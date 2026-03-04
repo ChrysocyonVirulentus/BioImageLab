@@ -1,0 +1,76 @@
+# =========================
+# PYTHON
+# =========================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================
+# ENTORNOS VIRTUALES
+# =========================
+
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# =========================
+# VARIABLES DE ENTORNO
+# =========================
+
+.env
+.env.*
+*.local
+
+# =========================
+# TESTING / COVERAGE
+# =========================
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.ruff_cache/
+
+# =========================
+# LOGS
+# =========================
+
+*.log
+
+# =========================
+# IDEs / EDITORES
+# =========================
+
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# =========================
+# SISTEMA OPERATIVO
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+# JUPYTER NOTEBOOK
+# =========================
+
+.ipynb_checkpoints/
+
+# =========================
+# CACHE GENERAL
+# =========================
+
+.cache/
