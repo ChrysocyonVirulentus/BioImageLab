@@ -193,34 +193,13 @@ nucleo/
 │
 ├── transformador/                  # Rotaciones, escalado, Warp manual  
 │   ├── geometricos/ 
-│   │   └── Transfromadores_Geometricos.py  
+│   │   └── Transfromadores_Geometricos.py  # TransformacionDistancia,  Esqueletizacion, EjeMedial, Deformar, Redimensionar, Rotacion, Remuestreo
 │   │
 │   ├── espectrales/ 
-│   │   └── Transfromadores_Espectrales.py  
+│   │   └── Transfromadores_Espectrales.py  # Fourier, Wavelet, Gabor
 │   │ 
 │   └── integrales/             
-│        └── Transfromadores_Proyectivos.py      
-│
-├── modelador/                 
-│   ├── dimensionalidad/                 
-│   │   ├── pca.py
-│   │   ├── umap.py
-│   │   └── tsne.py
-│   │
-│   ├── clustering/              
-│   │   ├── kmeans.py
-│   │   └── dbscan.py
-│   │
-│   ├── clasificacion/  
-│   │   ├── svm.py
-│   │   └── random_forest.py
-│   │
-│   ├── tracking/  
-│   │   └── multi_objeto.py
-│   │
-│   └── ajuste/  
-│       ├── ajuste_superficie.py
-│       └── ajuste_psf.py
+│        └── Transfromadores_Proyectivos.py # Radon, IntegralDeLinea, Hough, TransformadaDistanciaGeodesica, TransformadaHilbert, Abel
 │
 ├── extractor/
 │   ├── contornos/
@@ -228,10 +207,7 @@ nucleo/
 │   │   └── hull.py
 │   │
 │   ├── geometria/
-│   │   ├── centroides.py
-│   │   ├── caja_frontera.py
-│   │   ├── area.py
-│   │   └── diametro.py
+│   │   └── Extractor_Geometricos.py
 │   │
 │   ├── textura/
 │   │   ├── glcm.py
@@ -267,6 +243,29 @@ nucleo/
 │   └── estadisticas_objetos/
 │       ├── distribuciones.py
 │       └── correlaciones.py
+│
+├── modelador/                 
+│   ├── dimensionalidad/                 
+│   │   ├── pca.py
+│   │   ├── umap.py
+│   │   └── tsne.py
+│   │
+│   ├── clustering/              
+│   │   ├── kmeans.py
+│   │   └── dbscan.py
+│   │
+│   ├── clasificacion/  
+│   │   ├── svm.py
+│   │   └── random_forest.py
+│   │
+│   ├── tracking/  
+│   │   └── multi_objeto.py
+│   │
+│   └── ajuste/  
+│       ├── ajuste_superficie.py
+│       └── ajuste_psf.py
+│
+│
 │
 ├── analizador/
 │   ├── plots/
