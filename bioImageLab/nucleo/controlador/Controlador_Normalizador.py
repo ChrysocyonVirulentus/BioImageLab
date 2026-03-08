@@ -12,6 +12,14 @@ from ..preprocesador.normalizador.Metodos_Normalizacion import (
     PercentilNorm, 
     ZScoreNorm
 )
+
+from ..preprocesador.normalizador.Metodos_CambioTipos import (
+    ToUint8,
+    ToUint16,
+    ToFloat32,
+    ToFloat64
+)
+
 from .Resultado_Either import Resultado, Err, Ok
 from .Controlador_BioImagen import (
     BioImagenData, 

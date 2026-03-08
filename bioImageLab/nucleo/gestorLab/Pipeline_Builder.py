@@ -47,6 +47,9 @@ class PipelineBuilder:
     
     def _validar_orden(self, nueva_op: Operacion) -> bool:
         """Valida orden canónico (necesario pero no suficiente)"""
+        if self._modo_estricto == False:
+            return True
+
         if self._ultima_categoria is None:
             return True
         

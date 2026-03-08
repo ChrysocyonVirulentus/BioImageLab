@@ -130,7 +130,6 @@ MetodoRealce = Union[
 def crear_realce(
     metodo: MetodoRealce,
     tipo: TipoRealce = Realce_Global(),
-    canal: int = 0
 ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
     """
     Factory curried que retorna función pura de realce.
@@ -143,13 +142,13 @@ def crear_realce(
     Returns:
         Callable para usar con .bind() en pipelines
     """
-    def _aplicar_realce(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
+    def _aplicar_realce(data: BioImagenData, canal_idx: 0) -> Resultado[BioImagenData, ErrorBioImagen]:
         
         # Validación de canal
-        if not (0 <= canal < data.dims.C):
+        if not (0 <= canal_idx < data.dims.C):
             return Err(ErrorBioImagen(
                 etapa="realce",
-                mensaje=f"Canal {canal} fuera de rango [0, {data.dims.C-1}]",
+                mensaje=f"Canal {canal_idx} fuera de rango [0, {data.dims.C-1}]",
                 ruta=data.ruta_origen
             ))
         
@@ -157,7 +156,7 @@ def crear_realce(
             T, Z, C, Y, X = data.dims.shape
             
             # Extraer canal objetivo [T, Z, Y, X]
-            canal_data = data.datos[:, :, canal, :, :]
+            canal_data = data.datos[:, :, canal_idx, :, :]
             
             # Array resultado manteniendo estructura 5D
             resultado_canal = np.zeros((T, Z, 1, Y, X), dtype=np.float64)
@@ -186,7 +185,7 @@ def crear_realce(
             
             # Reconstruir BioImagenData
             nuevos_datos = data.datos.copy().astype(np.float64)
-            nuevos_datos[:, :, canal, :, :] = resultado_canal[:, :, 0, :, :]
+            nuevos_datos[:, :, canal_idx, :, :] = resultado_canal[:, :, 0, :, :]
             
             return Ok(replace(data, datos=nuevos_datos))
             
@@ -731,10 +730,12 @@ def operacion_realce(
     """
     nombre_op = nombre or f"realce_{metodo.__class__.__name__}_{tipo.__class__.__name__}"
     
+    realce_callable = crear_realce(metodo, tipo)
+
     return Operacion(
         nombre=nombre_op,
         categoria=CategoriaOperacion.REALZADOR,
-        instancia_callable=metodo,
+        instancia_callable=realce_callable,
         canal_objetivo=canal,
         parametros_originales={
             "metodo": metodo.__class__.__name__,

@@ -123,7 +123,7 @@ class Otsu(MetodoBinarizacion):
         """
         pass
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización de Otsu.
             
@@ -142,7 +142,7 @@ class Otsu(MetodoBinarizacion):
             umbral, img_binaria = cv2.threshold(
                 img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
             )
-            return umbral, img_binaria
+            return img_binaria
         
         elif img.dtype == np.uint16:
             # Escalar a uint8 para Otsu
@@ -154,7 +154,7 @@ class Otsu(MetodoBinarizacion):
             umbral_real = umbral_uint8 * 256
             # Aplicar umbral a imagen original
             img_binaria = np.where(img > umbral_real, 255, 0).astype(np.uint8)
-            return umbral_real, img_binaria
+            return img_binaria
         
         else:
             raise TypeError(
@@ -210,7 +210,7 @@ class Global(MetodoBinarizacion):
         self.umbral = umbral
         self.invertir = invertir
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización global.
             
@@ -227,7 +227,7 @@ class Global(MetodoBinarizacion):
         else:
             img_binaria = np.where(img > self.umbral, 255, 0).astype(np.uint8)
         
-        return self.umbral, img_binaria
+        return img_binaria
 
 
 class Adaptativo(MetodoBinarizacion):
@@ -300,7 +300,7 @@ class Adaptativo(MetodoBinarizacion):
         self.metodo = metodo
         self.C = C
     
-    def __call__(self, img: np.ndarray) -> Tuple[None, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización adaptativa.
             
@@ -342,7 +342,7 @@ class Adaptativo(MetodoBinarizacion):
             self.C
         )
         
-        return None, img_binaria
+        return img_binaria
 
 
 class Percentil(MetodoBinarizacion):
@@ -393,7 +393,7 @@ class Percentil(MetodoBinarizacion):
         
         self.percentil = percentil
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización por percentil.
             
@@ -411,7 +411,7 @@ class Percentil(MetodoBinarizacion):
         # Binarizar
         img_binaria = np.where(img > umbral, 255, 0).astype(np.uint8)
         
-        return umbral, img_binaria
+        return img_binaria
 
 
 class Triangle(MetodoBinarizacion):
@@ -451,7 +451,7 @@ class Triangle(MetodoBinarizacion):
         """Inicializa el método Triangle (sin parámetros)."""
         pass
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización Triangle.
             
@@ -467,7 +467,7 @@ class Triangle(MetodoBinarizacion):
             umbral, img_binaria = cv2.threshold(
                 img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_TRIANGLE
             )
-            return umbral, img_binaria
+            return img_binaria
         
         elif img.dtype == np.uint16:
             img_uint8 = (img / 256).astype(np.uint8)
@@ -476,7 +476,7 @@ class Triangle(MetodoBinarizacion):
             )
             umbral_real = umbral_uint8 * 256
             img_binaria = np.where(img > umbral_real, 255, 0).astype(np.uint8)
-            return umbral_real, img_binaria
+            return img_binaria
         
         else:
             raise TypeError(
@@ -514,7 +514,7 @@ class Mean(MetodoBinarizacion):
         """Inicializa el método Mean (sin parámetros)."""
         pass
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
         Aplica umbralización por media.
         
@@ -529,7 +529,7 @@ class Mean(MetodoBinarizacion):
         umbral = np.mean(img)
         img_binaria = np.where(img > umbral, 255, 0).astype(np.uint8)
         
-        return umbral, img_binaria
+        return img_binaria
 
 
 class Isodata(MetodoBinarizacion):
@@ -578,7 +578,7 @@ class Isodata(MetodoBinarizacion):
         self.max_iter = max_iter
         self.tol = tol
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización Isodata.
             
@@ -619,7 +619,7 @@ class Isodata(MetodoBinarizacion):
         # Binarizar
         img_binaria = np.where(img > umbral, 255, 0).astype(np.uint8)
         
-        return umbral, img_binaria
+        return img_binaria
 
 
 class Minimum(MetodoBinarizacion):
@@ -664,7 +664,7 @@ class Minimum(MetodoBinarizacion):
         
         self.suavizado = suavizado
     
-    def __call__(self, img: np.ndarray) -> Tuple[float, np.ndarray]:
+    def __call__(self, img: np.ndarray) -> np.ndarray:
         """
             Aplica umbralización por mínimo entre picos.
             
@@ -698,4 +698,4 @@ class Minimum(MetodoBinarizacion):
         # Binarizar
         img_binaria = np.where(img > umbral, 255, 0).astype(np.uint8)
         
-        return umbral, img_binaria
+        return img_binaria

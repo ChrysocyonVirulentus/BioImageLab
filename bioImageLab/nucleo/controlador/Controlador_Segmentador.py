@@ -97,7 +97,6 @@ MetodoSegmentacion = Union[
 def crear_segmentacion(
     metodo: MetodoSegmentacion,
     tipo: TipoSegmentacion = Segmentacion_PorCorteEspaciotemporal(),
-    canal: int = 0
 ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
     """
     Factory curried que retorna función pura de segmentación.
@@ -110,13 +109,13 @@ def crear_segmentacion(
     Returns:
         Callable para usar con .bind() en pipelines
     """
-    def _aplicar_segmentacion(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
+    def _aplicar_segmentacion(data: BioImagenData, canal_idx: 0) -> Resultado[BioImagenData, ErrorBioImagen]:
         
         # Validación de canal
-        if not (0 <= canal < data.dims.C):
+        if not (0 <= canal_idx < data.dims.C):
             return Err(ErrorBioImagen(
                 etapa="segmentacion",
-                mensaje=f"Canal {canal} fuera de rango [0, {data.dims.C-1}]",
+                mensaje=f"Canal {canal_idx} fuera de rango [0, {data.dims.C-1}]",
                 ruta=data.ruta_origen
             ))
         
@@ -124,7 +123,7 @@ def crear_segmentacion(
             T, Z, C, Y, X = data.dims.shape
             
             # Extraer canal objetivo [T, Z, Y, X]
-            canal_data = data.datos[:, :, canal, :, :]
+            canal_data = data.datos[:, :, canal_idx, :, :]
             
             # Array resultado: máscara binaria o etiquetada (mismo shape)
             resultado_canal = np.zeros((T, Z, 1, Y, X), dtype=np.uint16)  # uint16 para etiquetas
@@ -162,11 +161,11 @@ def crear_segmentacion(
             # Reconstruir BioImagenData con máscara/etiquetas
             # Preservar metadatos originales pero marcar que es segmentación
             nuevos_datos = np.zeros_like(data.datos, dtype=np.uint16)
-            nuevos_datos[:, :, canal, :, :] = resultado_canal[:, :, 0, :, :]
+            nuevos_datos[:, :, canal_idx, :, :] = resultado_canal[:, :, 0, :, :]
             
             # Copiar otros canales si existen (para mantener contexto)
             for c in range(C):
-                if c != canal:
+                if c != canal_idx:
                     # Para canales no segmentados, podemos copiar o poner ceros
                     # Aquí copiamos para mantener referencia
                     nuevos_datos[:, :, c, :, :] = data.datos[:, :, c, :, :]
@@ -177,7 +176,7 @@ def crear_segmentacion(
                 metadata={
                     **data.__dict__.get('metadata', {}),
                     'es_segmentacion': True,
-                    'canal_segmentado': canal,
+                    'canal_segmentado': canal_idx,
                     'metodo_segmentacion': metodo.__class__.__name__,
                     'tipo_segmentacion': tipo.__class__.__name__
                 }
@@ -644,10 +643,12 @@ def operacion_segmentacion(
         'SplitDistancial', 'WatershedHibrido', 'SplitWatershed'
     }
     
+    segmentacion_callable = crear_segmentacion(metodo, tipo)
+
     return Operacion(
         nombre=nombre_op,
         categoria=CategoriaOperacion.SEGMENTADOR,
-        instancia_callable=metodo,
+        instancia_callable=segmentacion_callable,
         canal_objetivo=canal,
         parametros_originales={
             "metodo": metodo.__class__.__name__,

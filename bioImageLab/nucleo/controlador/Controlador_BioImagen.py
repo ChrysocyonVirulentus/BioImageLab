@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import cv2
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, field
 from pathlib import Path
 from typing import List, Optional, Tuple, Callable, Any, Iterator
 from bioio import BioImage
@@ -36,7 +36,8 @@ class BioImagenData:
     dims: Dimensiones
     canales: Tuple[str, ...]
     ruta_origen: Path
-    es_bioformato: bool = False  # Metadata para saber el origen
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    es_bioformato: bool = False  # para saber el origen
     
     def __post_init__(self):
         # Validación inmutable: verificar consistencia

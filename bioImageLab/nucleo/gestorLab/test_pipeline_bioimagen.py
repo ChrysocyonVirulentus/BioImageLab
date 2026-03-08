@@ -22,6 +22,7 @@ from ..analizador.exportacion.bioimagenes import panel_transformaciones, Estetic
 from ..controlador.Controlador_Normalizador import (
     operacion_normalizacion,
     Norm_Global,
+    ToUint8,
     MaxNorm,
 )
 
@@ -39,8 +40,8 @@ from ..controlador.Controlador_Realzador import (
 
 from ..controlador.Controlador_Segmentador import (
     operacion_segmentacion,
-    Segmentacion_PorCorteEspaciotemporal,
-    Otsu,
+    Segmentacion_Global,
+    Global,
 )
 
 
@@ -85,17 +86,18 @@ def crear_operaciones_pipeline() -> list[Operacion]:
         nombre="apertura_3x3"
     )
     operaciones.append(op_apertura)
-    
+
     # 4. SEGMENTACIÓN (SEGMENTADOR)
-    metodo_otsu = Otsu()
+    metodo_global = Global(umbral=25)
     
-    op_otsu = operacion_segmentacion(
-        metodo=metodo_otsu,
-        tipo=Segmentacion_PorCorteEspaciotemporal(),
+    op_global = operacion_segmentacion(
+        metodo=metodo_global,
+        tipo=Segmentacion_Global(),
         canal=0,
-        nombre="otsu_auto"
+        nombre="global_auto"
     )
-    operaciones.append(op_otsu)
+    operaciones.append(op_global)
+
     
     return operaciones
 
@@ -214,15 +216,10 @@ def ejecutar_pipeline_test(
     
     imagenes = [extraer_corte(resultados_intermedios[nom]) for nom in nombres_etapas]
     etiquetas = [nom.replace("_", " ").title() for nom in nombres_etapas]
-    
-    estetica = EsteticaGrafico(
-        tema='oscuro',
-        fuente='sans-serif',
-        tamano_fuente=10
-    )
+
     
     try:
-        fig = panel_transformaciones(
+        fig, _ = panel_transformaciones(
             imagenes=imagenes,
             etiquetas=etiquetas,
             titulo_general=f"Pipeline: {ruta_imagen.name}",
@@ -235,7 +232,6 @@ def ejecutar_pipeline_test(
             alto=4.0,
             fuente_titulo_general=12,
             fuente_subtitulo=9,
-            estetica=estetica,
             mostrar=False
         )
         
