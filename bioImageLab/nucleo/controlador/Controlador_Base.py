@@ -2,38 +2,23 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import replace
-from typing import Callable, Optional, Dict, Any, TypeVar, Generic, Type
+from typing import Callable, Optional, Dict, Any, TypeVar, Generic
 
-# Tipos genéricos
 TSalida = TypeVar("TSalida")
 
-# Registro global de métodos (para YAML / factories dinámicos)
-REGISTRO_METODOS: Dict[str, Type] = {}
-
-
-def registrar_metodo(cls):
-    nombre = getattr(cls, "nombre", cls.__name__.lower())
-    REGISTRO_METODOS[nombre] = cls
-    return cls
-
-
-# Imports de tu sistema
+# Sistema
 from .Resultado_Either import Resultado, Ok, Err
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 
+from ..gestorLab.Registro_Metodos import registro_metodos
+from ..gestorLab.Operacion import Operacion, TipoSalida
+
 
 class Controlador_Base(Generic[TSalida]):
-    """
-    Core genérico reutilizable para procesamiento de BioImagenData.
 
-    Soporta:
-    - Imagen → Imagen
-    - Imagen → máscara
-    - Imagen → métricas / DataFrame
-    """
-
-    def __init__(self, etapa: str = "procesamiento"):
+    def __init__(self, etapa: str = "procesamiento", dominio: str = "general"):
         self._etapa = etapa
+        self._dominio = dominio  # 🔥 NUEVO
         self._ultimo_metodo: Optional[Any] = None
         self._cache: Optional[Dict[str, Any]] = None
 
@@ -46,7 +31,7 @@ class Controlador_Base(Generic[TSalida]):
 
     def _postprocesar(self, data: BioImagenData, resultado, canal_idx: int):
         if not isinstance(resultado, np.ndarray):
-            return resultado  # analizador
+            return resultado
 
         nuevos = data.datos.copy()
         nuevos[:, :, canal_idx, :, :] = resultado
@@ -69,7 +54,7 @@ class Controlador_Base(Generic[TSalida]):
 
     def _validar_entrada(self, data: BioImagenData, canal: int):
         if not (0 <= canal < data.dims.C):
-            raise ValueError(f"Canal {canal} fuera de rango [0, {data.dims.C-1}]")
+            raise ValueError(f"Canal {canal} fuera de rango")
 
     def _extraer_canal(self, data: BioImagenData, canal: int):
         return data.datos[:, :, canal, :, :]
@@ -148,6 +133,29 @@ class Controlador_Base(Generic[TSalida]):
     # ===================== FACTORIES ==========================
     # =========================================================
 
+    def crear_operacion(
+        self,
+        nombre_metodo: str,
+        categoria,
+        tipo_aplicacion=None,
+        canal: Optional[int] = None,
+        nombre: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None
+    ):
+        clase = registro_metodos.obtener(self._dominio, nombre_metodo)
+        metodo = clase(**(params or {}))
+
+        operador = self.crear_operador(metodo, tipo_aplicacion)
+
+        return Operacion(
+            nombre=nombre or f"{self._etapa}_{nombre_metodo}",
+            categoria=categoria,
+            instancia_callable=operador,
+            canal_objetivo=canal,
+            parametros_originales=params or {},
+            tipo_salida=TipoSalida.IMAGEN  # override en hijos
+        )
+
     def crear_operador(
         self,
         metodo,
@@ -157,26 +165,19 @@ class Controlador_Base(Generic[TSalida]):
         self._ultimo_metodo = metodo
 
         def _op(data: BioImagenData, canal_idx: int = 0):
-            return self._ejecutar(
-                data,
-                metodo,
-                tipo_aplicacion,
-                canal_idx
-            )
+            return self._ejecutar(data, metodo, tipo_aplicacion, canal_idx)
 
         return _op
 
-    # factory dinámico desde string (YAML-friendly)
+    # YAML / dinámico
     def crear(
         self,
         nombre_metodo: str,
         tipo_aplicacion=None,
         **params
     ):
-        if nombre_metodo not in REGISTRO_METODOS:
-            raise ValueError(f"Método '{nombre_metodo}' no registrado")
+        clase = registro_metodos.obtener(self._dominio, nombre_metodo)
 
-        clase = REGISTRO_METODOS[nombre_metodo]
         metodo = clase(**params)
 
         return self.crear_operador(metodo, tipo_aplicacion)
@@ -206,37 +207,6 @@ class Controlador_Base(Generic[TSalida]):
         return _multi
 
     # =========================================================
-    # ================= PIPELINE ===============================
-    # =========================================================
-
-    def crear_operacion_pipeline(
-        self,
-        metodo,
-        tipo_aplicacion,
-        canal: int,
-        categoria,
-        nombre: Optional[str] = None,
-        extra_params: Optional[Dict[str, Any]] = None
-    ):
-
-        from ..gestorLab.Operacion import Operacion, TipoSalida
-
-        nombre_op = nombre or f"{self._etapa}_{metodo.__class__.__name__}"
-
-        operador = self.crear_operador(metodo, tipo_aplicacion)
-
-        return Operacion(
-            nombre=nombre_op,
-            categoria=categoria,
-            instancia_callable=operador,
-            canal_objetivo=canal,
-            parametros_originales=extra_params or {},
-            tipo_salida=TipoSalida.IMAGEN
-        )
-
-    # =========================================================
-    # ================= UTIL ==================================
-    # =========================================================
 
     def reset(self):
         self._cache = None
@@ -244,4 +214,4 @@ class Controlador_Base(Generic[TSalida]):
 
     def __repr__(self):
         ultimo = getattr(self._ultimo_metodo, "nombre", "Ninguno")
-        return f"<{self.__class__.__name__} ultimo={ultimo}>"
+        return f"<{self.__class__.__name__} dominio={self._dominio} ultimo={ultimo}>"
