@@ -107,7 +107,7 @@ class DetectorGradiente:
         direccion = np.arctan2(gy, gx)  # [-pi, pi]
         return magnitud, direccion
 
-
+@registrar_en("realzado")
 class Laplaciano(DetectorGradiente):
     """
         Operador Laplaciano para detección de bordes por segunda derivada.
@@ -231,7 +231,7 @@ class Laplaciano(DetectorGradiente):
         
         return bordes
 
-
+@registrar_en("realzado")
 class Canny(DetectorGradiente):
     """
         Detector de bordes de Canny - algoritmo óptimo.
@@ -340,7 +340,7 @@ class Canny(DetectorGradiente):
         
         return bordes
 
-
+@registrar_en("realzado")
 class Sobel(DetectorGradiente):
     """
         Operador Sobel para cálculo de gradientes con suavizado integrado.
@@ -457,7 +457,7 @@ class Sobel(DetectorGradiente):
         
         return magnitud, direccion
 
-
+@registrar_en("realzado")
 class Scharr(DetectorGradiente):
     """
         Operador Scharr - mejora isotrópica del Sobel.
@@ -562,7 +562,7 @@ class Scharr(DetectorGradiente):
         direccion = np.arctan2(gy, gx)
         return magnitud, direccion
 
-
+@registrar_en("realzado")
 class Prewitt(DetectorGradiente):
     """
         Operador Prewitt - alternativa simple al Sobel.
@@ -633,7 +633,7 @@ class Prewitt(DetectorGradiente):
         
         return magnitud.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class Roberts(DetectorGradiente):
     """
         Operador de Roberts - detector cruzado de 2x2.
@@ -707,7 +707,7 @@ class Roberts(DetectorGradiente):
         
         return magnitud.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class LaplacianoCero(DetectorGradiente):
     """
         Detector de bordes por cruces por cero del Laplaciano con subpixel.

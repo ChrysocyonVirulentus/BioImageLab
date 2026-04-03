@@ -130,7 +130,7 @@ MetodoRealce = Union[
 def crear_realce(
     metodo: MetodoRealce,
     tipo: TipoRealce = Realce_Global(),
-) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
+) -> Callable[[BioImagenData, int], Resultado[BioImagenData, ErrorBioImagen]]:
     """
     Factory curried que retorna función pura de realce.
     
@@ -142,14 +142,28 @@ def crear_realce(
     Returns:
         Callable para usar con .bind() en pipelines
     """
-    def _aplicar_realce(data: BioImagenData, canal_idx: 0) -> Resultado[BioImagenData, ErrorBioImagen]:
+    def _aplicar_realce(canal_idx: 0) -> Resultado[BioImagenData, ErrorBioImagen]:
         
+        nombre_metodo = getattr(metodo, 'nombre', metodo.__class__.__name__)
+
+        resultado = Ok(data).log(LogEvento(
+            etapa="realce",
+            mensaje=f"Iniciando {nombre_metodo}",
+            nivel=NivelLog.INFO,
+            metadata={"canal": canal_idx}
+        ))
+
         # Validación de canal
         if not (0 <= canal_idx < data.dims.C):
             return Err(ErrorBioImagen(
                 etapa="realce",
                 mensaje=f"Canal {canal_idx} fuera de rango [0, {data.dims.C-1}]",
                 ruta=data.ruta_origen
+            )).log(LogEvento(
+                etapa="realce",
+                mensaje="Canal fuera de rango",
+                nivel=NivelLog.ERROR,
+                metadata={"canal": canal_idx}
             ))
         
         try:
@@ -167,7 +181,8 @@ def crear_realce(
                     for t in range(T):
                         for z in range(Z):
                             resultado_canal[t, z, 0, :, :] = metodo(canal_data[t, z, :, :])
-                            
+
+                # MODIFICAR LOS TIPOS DE ITERACION            
                 case Realce_PorCorteZ():
                     for z in range(Z):
                         for t in range(T):
@@ -187,15 +202,30 @@ def crear_realce(
             nuevos_datos = data.datos.copy().astype(np.float64)
             nuevos_datos[:, :, canal_idx, :, :] = resultado_canal[:, :, 0, :, :]
             
-            return Ok(replace(data, datos=nuevos_datos))
+            return Ok(replace(data, datos=nuevos_datos)).log(LogEvento(
+                etapa="realce",
+                mensaje=f"{nombre_metodo} aplicado",
+                nivel=NivelLog.INFO,
+                metadata={
+                    "canal": canal_idx,
+                    "tipo": tipo.__class__.__name__
+                }
+            ))
             
         except Exception as e:
-            nombre_metodo = getattr(metodo, 'nombre', metodo.__class__.__name__)
             return Err(ErrorBioImagen(
                 etapa="realce",
                 mensaje=f"Fallo en {nombre_metodo}: {str(e)}",
                 ruta=data.ruta_origen,
                 causa=e
+            )).log(LogEvento(
+                etapa="realce",
+                mensaje=f"Error en {nombre_metodo}",
+                nivel=NivelLog.ERROR,
+                metadata={
+                    "canal": canal_idx,
+                    "error": str(e)
+                }
             ))
     
     return _aplicar_realce
@@ -205,13 +235,14 @@ def crear_realce_multicanal(
     metodo: MetodoRealce,
     tipo: TipoRealce = Realce_Global()
 ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-    """Versión que aplica el mismo realce a todos los canales."""
+    
     def _aplicar_multicanal(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
         resultado: Resultado[BioImagenData, ErrorBioImagen] = Ok(data)
         
         for c in range(data.dims.C):
-            realce_canal = crear_realce(metodo, tipo, canal=c)
-            resultado = resultado.bind(realce_canal)
+            realce_canal = crear_realce(metodo, tipo)
+            resultado = resultado.bind(lambda d, canal=c: realce_canal(d, canal))
+            
             if resultado.es_err():
                 break
         

@@ -80,7 +80,7 @@ class RealzadorEstructural:
         """
         return gaussian_filter(img.astype(np.float64), sigma=sigma)
 
-
+@registrar_en("realzado")
 class Hessiano(RealzadorEstructural):
     """
         Análisis de la matriz Hessiana para detección de tubos.
@@ -203,7 +203,7 @@ class Hessiano(RealzadorEstructural):
         
         return lambda1_out, lambda2_out
 
-
+@registrar_en("realzado")
 class Frangi(RealzadorEstructural):
     """
         Filtro de Frangi para vesselness basado en razón de eigenvalores Hessianos.
@@ -348,7 +348,7 @@ class Frangi(RealzadorEstructural):
         
         return vesselness_max
 
-
+@registrar_en("realzado")
 class Sato(RealzadorEstructural):
     """
         Filtro de Sato (mejora del Frangi) para vesselness.
@@ -487,7 +487,7 @@ class Sato(RealzadorEstructural):
         
         return vesselness_max
 
-
+@registrar_en("realzado")
 class TensorEstructural(RealzadorEstructural):
     """
         Tensor de estructura (Structure Tensor) para análisis de coherencia local.

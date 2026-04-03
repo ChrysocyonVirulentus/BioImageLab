@@ -100,7 +100,7 @@ class Deconvolucionador:
         psf_padded = np.fft.ifftshift(psf_padded)
         return psf_padded
 
-
+@registrar_en("realzado")
 class Wiener(Deconvolucionador):
     """
         Filtro de Wiener para deconvolución en dominio de frecuencia.
@@ -211,7 +211,7 @@ class Wiener(Deconvolucionador):
         
         return img_restaurada
 
-
+@registrar_en("realzado")
 class RichardsonLucy(Deconvolucionador):
     """
         Deconvolución de Richardson-Lucy (máxima verosimilitud Poisson).
@@ -328,7 +328,7 @@ class RichardsonLucy(Deconvolucionador):
         
         return resultado
 
-
+@registrar_en("realzado")
 class BlindDeconvolucion(Deconvolucionador):
     """
         Deconvolución ciega para cuando la PSF es desconocida.
@@ -487,7 +487,7 @@ class BlindDeconvolucion(Deconvolucionador):
         
         return img_est, psf
 
-
+@registrar_en("realzado")
 class Tikhonov(Deconvolucionador):
     """
         Deconvolución regularizada de Tikhonov (norma L2).

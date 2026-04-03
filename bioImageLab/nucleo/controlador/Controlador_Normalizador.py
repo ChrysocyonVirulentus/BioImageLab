@@ -91,12 +91,27 @@ def crear_normalizador(
         canal_idx: int = 0
     ) -> Resultado[BioImagenData, ErrorBioImagen]:
         
+
+        nombre_metodo = getattr(metodo, "nombre", metodo.__class__.__name__)
+
+        resultado_inicial = Ok(data).log(LogEvento(
+            etapa="normalizacion",
+            mensaje=f"Iniciando {nombre_metodo}",
+            nivel=NivelLog.INFO,
+            metadata={"canal": canal_idx}
+        ))
+
         # Validaciones
         if not (0 <= canal_idx < data.dims.C):
             return Err(ErrorBioImagen(
                 etapa="normalizacion",
                 mensaje=f"Canal {canal_idx} fuera de rango [0, {data.dims.C-1}]",
                 ruta=data.ruta_origen
+            )).log(LogEvento(
+                etapa="normalizacion",
+                mensaje="Canal fuera de rango",
+                nivel=NivelLog.ERROR,
+                metadata={"canal": canal_idx}
             ))
         
         try:
@@ -106,7 +121,7 @@ def crear_normalizador(
             canal_data = data.datos[:, :, canal_idx, :, :]  # Shape: (T, Z, Y, X)
             
             # Preparar array de resultado manteniendo dimensión C=1
-            resultado_canal = np.zeros((T, Z, 1, Y, X), dtype=np.float64)
+            resultado_canal = np.zeros((T, Z, 1, Y, X), dtype=canal_data.dtype) #NOTA: Cambiar a dtype=np.float64 si falla
             
             # Aplicar estrategia según tipo algebraico
             match tipo:
@@ -140,18 +155,34 @@ def crear_normalizador(
                             resultado_canal[t, z, 0, :, :] = metodo(corte)
             
             # Reconstruir BioImagenData con canal normalizado reemplazado
-            nuevos_datos = data.datos.copy().astype(np.float64)
+            nuevos_datos = data.datos.copy() # NOTA: Agregar .astype(np.float64) si falla
             nuevos_datos[:, :, canal_idx, :, :] = resultado_canal[:, :, 0, :, :]
             
             # Preservar metadatos, actualizar datos
-            return Ok(replace(data, datos=nuevos_datos))
+            return Ok(replace(data, datos=nuevos_datos)).log(LogEvento(
+                etapa="normalizacion",
+                mensaje=f"{nombre_metodo} aplicado",
+                nivel=NivelLog.INFO,
+                metadata={
+                    "canal": canal_idx,
+                    "tipo": tipo.__class__.__name__
+                }
+            ))
             
         except Exception as e:
             return Err(ErrorBioImagen(
                 etapa="normalizacion",
-                mensaje=f"Fallo en {metodo.nombre} con {tipo.__class__.__name__}: {str(e)}",
+                mensaje=f"Fallo en {nombre_metodo}: {str(e)}",
                 ruta=data.ruta_origen,
                 causa=e
+            )).log(LogEvento(
+                etapa="normalizacion",
+                mensaje=f"Error en {nombre_metodo}",
+                nivel=NivelLog.ERROR,
+                metadata={
+                    "canal": canal_idx,
+                    "error": str(e)
+                }
             ))
     
     return _normalizar_canal

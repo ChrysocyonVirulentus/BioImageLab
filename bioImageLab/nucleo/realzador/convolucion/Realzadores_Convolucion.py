@@ -127,7 +127,7 @@ class Convolucionador:
         
         return resultado.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class KernelPersonalizado(Convolucionador):
     """
         Convolución con kernel arbitrario definido por el usuario.
@@ -238,7 +238,7 @@ class KernelPersonalizado(Convolucionador):
         """Devuelve el kernel actual (útil para inspección)."""
         return self.kernel.copy()
 
-
+@registrar_en("realzado")
 class PSFSimulacion(Convolucionador):
     """
         Simulación de Funciones de Dispersión de Punto (PSF) teóricas.
@@ -550,7 +550,7 @@ class PSFSimulacion(Convolucionador):
             **self.kwargs
         }
 
-
+@registrar_en("realzado")
 class KernelSeparable(Convolucionador):
     """
         Optimización de convolución para kernels separables.
@@ -711,7 +711,7 @@ class KernelSeparable(Convolucionador):
         
         return kernel
 
-
+@registrar_en("realzado")
 class ConvolucionFrecuencia(Convolucionador):
     """
         Implementación de convolución mediante Transformada Rápida de Fourier.
@@ -851,7 +851,7 @@ class ConvolucionFrecuencia(Convolucionador):
         
         return resultado
 
-
+@registrar_en("realzado")
 class CorreccionBordes(Convolucionador):
     """
         Convolución con extrapolación avanzada de bordes.

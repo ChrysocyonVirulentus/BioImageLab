@@ -88,7 +88,7 @@ class SegmentadorInstancial:
         from skimage.color import label2rgb
         return (label2rgb(etiquetas, bg_label=0, bg_color=(0,0,0)) * 255).astype(np.uint8)
 
-
+@registrar_en("segmentado")
 class Watershed(SegmentadorInstancial):
     """
         Segmentación Watershed clásica basada en topografía de intensidad.
@@ -221,7 +221,7 @@ class Watershed(SegmentadorInstancial):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class WatershedMarcado(SegmentadorInstancial):
     """
         Watershed con marcadores controlados para evitar sobre-segmentación.
@@ -419,7 +419,7 @@ class WatershedMarcado(SegmentadorInstancial):
         
         return marcadores
 
-
+@registrar_en("segmentado")
 class DistanciaWatershed(SegmentadorInstancial):
     """
         Watershed sobre transformada de distancia para objetos redondos/convexos.
@@ -558,7 +558,7 @@ class DistanciaWatershed(SegmentadorInstancial):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class SplitDistancial(SegmentadorInstancial):
     """
         División de objetos tocantes por análisis de máximos de distancia.
@@ -738,7 +738,7 @@ class SplitDistancial(SegmentadorInstancial):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class WatershedHibrido(SegmentadorInstancial):
     """
         Watershed híbrido combinando gradiente de intensidad y distancia geométrica.
@@ -870,7 +870,7 @@ class WatershedHibrido(SegmentadorInstancial):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class SplitWatershed(SegmentadorInstancial):
     """
         División jerárquica por watershed para objetos anidados o múltiples escalas.
@@ -1039,7 +1039,7 @@ class SplitWatershed(SegmentadorInstancial):
         from skimage.segmentation import watershed
         return watershed(-distancia, marcadores, mask=mascara)
 
-
+@registrar_en("segmentado")
 class MarcadorControlado(SegmentadorInstancial):
     """
         Watershed con control estricto de marcadores para casos difíciles.

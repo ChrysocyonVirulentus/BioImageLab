@@ -89,7 +89,7 @@ class RealzadorMorfologico:
         else:
             raise ValueError(f"forma '{forma}' no válida. Usar 'rect', 'elipse' o 'cruz'")
 
-
+@registrar_en("realzado")
 class Apertura(RealzadorMorfologico):
     """
         Operador de apertura morfológica (erosión seguida de dilatación).
@@ -169,7 +169,7 @@ class Apertura(RealzadorMorfologico):
             iterations=self.iteraciones
         )
 
-
+@registrar_en("realzado")
 class Cierre(RealzadorMorfologico):
     """
         Operador de cierre morfológico (dilatación seguida de erosión).
@@ -249,7 +249,7 @@ class Cierre(RealzadorMorfologico):
             iterations=self.iteraciones
         )
 
-
+@registrar_en("realzado")
 class TopHat(RealzadorMorfologico):
     """
         Operador Top-Hat (White Top-Hat) para extracción de objetos brillantes pequeños.
@@ -324,7 +324,7 @@ class TopHat(RealzadorMorfologico):
             self.kernel
         )
 
-
+@registrar_en("realzado")
 class BottomHat(RealzadorMorfologico):
     """
         Operador Bottom-Hat (Black Top-Hat) para extracción de objetos oscuros pequeños.
@@ -393,7 +393,7 @@ class BottomHat(RealzadorMorfologico):
             self.kernel
         )
 
-
+@registrar_en("realzado")
 class GradienteMorfologico(RealzadorMorfologico):
     """
         Operador de gradiente morfológico para detección de bordes.
@@ -484,7 +484,7 @@ class GradienteMorfologico(RealzadorMorfologico):
             dilation = cv2.dilate(img, self.kernel)
             return cv2.subtract(dilation, img)
 
-
+@registrar_en("realzado")
 class ReconstruccionMorfologica(RealzadorMorfologico):
     """
         Reconstrucción morfológica por dilatación geodésica.

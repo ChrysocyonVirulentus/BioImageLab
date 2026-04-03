@@ -26,7 +26,7 @@ Tipos disponibles:
 import numpy as np
 from typing import List, Tuple
 
-
+@registrar_en("filtrado")
 class FiltroEspectral:
     """
         Clase base para filtros espectrales basados en FFT.
@@ -96,7 +96,7 @@ class FiltroEspectral:
         
         return img_resultado.astype(img.dtype)
 
-
+@registrar_en("filtrado")
 class FFTPasaBajo(FiltroEspectral):
     """
         Filtro pasabajo (low-pass) gaussiano en el dominio de frecuencias.
@@ -141,7 +141,7 @@ class FFTPasaBajo(FiltroEspectral):
         y, x = np.ogrid[-centro[0]:forma[0]-centro[0], -centro[1]:forma[1]-centro[1]]
         return np.exp(-(x**2 + y**2) / (2 * self.radio**2))
 
-
+@registrar_en("filtrado")
 class FFTPasaAlto(FiltroEspectral):
     """
         Filtro pasaalto (high-pass) gaussiano en el dominio de frecuencias.
@@ -187,7 +187,7 @@ class FFTPasaAlto(FiltroEspectral):
         y, x = np.ogrid[-centro[0]:forma[0]-centro[0], -centro[1]:forma[1]-centro[1]]
         return 1 - np.exp(-(x**2 + y**2) / (2 * self.radio**2))
 
-
+@registrar_en("filtrado")
 class FFTPasaBanda(FiltroEspectral):
     """
         Filtro pasabanda (band-pass) en el dominio de frecuencias.
@@ -243,7 +243,7 @@ class FFTPasaBanda(FiltroEspectral):
         
         return mascara_alta - mascara_baja
 
-
+@registrar_en("filtrado")
 class FFTBandStop(FiltroEspectral):
     """
         Filtro rechaza-banda (band-stop/notch) en el dominio de frecuencias.
@@ -302,7 +302,7 @@ class FFTBandStop(FiltroEspectral):
         # Filtro Butterworth de orden 2
         return 1.0 / (1.0 + ((dist * self.ancho) / denom)**(2 * 2))
 
-
+@registrar_en("filtrado")
 class FiltradoNotch(FiltroEspectral):
     """
         Filtro notch para eliminación de múltiples frecuencias específicas.

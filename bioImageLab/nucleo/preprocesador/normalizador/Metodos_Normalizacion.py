@@ -14,6 +14,7 @@ class MetodoNormalizacion:
         raise NotImplementedError
 
 # Normalizar solo por el pixel maximo.
+@registrar_en("normalizado")
 class MaxNorm(MetodoNormalizacion):
     nombre = "max_norm"
 
@@ -30,6 +31,7 @@ class MaxNorm(MetodoNormalizacion):
         return img / img.max() if img.max() > 0 else img.astype(np.float64)
 
 # Normalizar por pixel maximo y minimo.abs
+@registrar_en("normalizado")
 class MinMaxNorm(MetodoNormalizacion):
     nombre = "min_max_norm"
 
@@ -47,6 +49,7 @@ class MinMaxNorm(MetodoNormalizacion):
         return (img - img.min()) / (img.max() - img.min()) if img.max() != img.min() else img.astype(np.float64)
 
 # Normalizar por percentil:
+@registrar_en("normalizado")
 class PercentilNorm(MetodoNormalizacion):
     nombre = "percentil_norm"
     def __init__(self, p_bajo: int = 2, p_alto: int = 98):
@@ -69,6 +72,7 @@ class PercentilNorm(MetodoNormalizacion):
         return np.clip((img - limites[0]) / (limites[1] - limites[0]), 0, 1) if limites[1] > limites[0] else img.astype(np.float64)
 
 # Normalizar por ZScore
+@registrar_en("normalizado")
 class ZScoreNorm(MetodoNormalizacion):
     nombre = "zscore_norm"
 

@@ -97,7 +97,7 @@ class SegmentadorRegional:
             return color.rgb2lab(img)
         return img
 
-
+@registrar_en("segmentado")
 class RegionGrowing(SegmentadorRegional):
     """
         Crecimiento de regiones desde semillas según criterio de homogeneidad.
@@ -317,7 +317,7 @@ class RegionGrowing(SegmentadorRegional):
         resultado, _ = ndimage.label(resultado > 0)
         return resultado.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class RandomWalk(SegmentadorRegional):
     """
         Segmentación por caminos aleatorios (Random Walker).
@@ -467,7 +467,7 @@ class RandomWalk(SegmentadorRegional):
             )
             return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class CorteGrafico(SegmentadorRegional):
     """
         Segmentación por corte mínimo en grafo (Graph Cut).
@@ -644,7 +644,7 @@ class CorteGrafico(SegmentadorRegional):
         etiquetas = etiquetas_sp[superpixels]
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class SuperpixelSLIC(SegmentadorRegional):
     """
         Segmentación en superpíxeles compactos y homogéneos (SLIC).
@@ -778,7 +778,7 @@ class SuperpixelSLIC(SegmentadorRegional):
         from skimage.segmentation import mark_boundaries
         return (mark_boundaries(img, etiquetas) * 255).astype(np.uint8)
 
-
+@registrar_en("segmentado")
 class SuperpixelFelzenszwalb(SegmentadorRegional):
     """
         Superpíxeles por partición de grafos (Felzenszwalb-Huttenlocher).
@@ -889,7 +889,7 @@ class SuperpixelFelzenszwalb(SegmentadorRegional):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class WatershedRegiones(SegmentadorRegional):
     """
         Watershed como segmentador regional sin máscara binaria previa.
@@ -987,7 +987,7 @@ class WatershedRegiones(SegmentadorRegional):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class MeanShiftSegmentacion(SegmentadorRegional):
     """
         Segmentación por modo de densidad (Mean Shift clustering).
@@ -1124,7 +1124,7 @@ class MeanShiftSegmentacion(SegmentadorRegional):
         
         return etiquetas.astype(np.int32)
 
-
+@registrar_en("segmentado")
 class SegmentacionEspectral(SegmentadorRegional):
     """
         Segmentación espectral basada en eigenvalores de matriz de similitud.

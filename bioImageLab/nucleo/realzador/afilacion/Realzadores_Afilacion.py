@@ -102,7 +102,7 @@ class RealzadorAfilacion:
         
         return resultado.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class AfilacionLaplaciana(RealzadorAfilacion):
     """
         Afilación basada en el operador Laplaciano.
@@ -200,7 +200,7 @@ class AfilacionLaplaciana(RealzadorAfilacion):
         self._validar_imagen(img)
         return self._aplicar_kernel(img, self.kernel)
 
-
+@registrar_en("realzado")
 class FiltroHighBoost(RealzadorAfilacion):
     """
         Filtro High-Boost para realce controlado de alta frecuencia.
@@ -315,7 +315,7 @@ class FiltroHighBoost(RealzadorAfilacion):
         
         return resultado.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class MascaraEnfoque(RealzadorAfilacion):
     """
         Unsharp Masking (Máscara de Enfoque) clásico.
@@ -435,7 +435,7 @@ class MascaraEnfoque(RealzadorAfilacion):
         
         return resultado.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class AfilacionGradiente(RealzadorAfilacion):
     """
         Afilación basada en la magnitud del gradiente (Sobel/Scharr).
@@ -550,7 +550,7 @@ class AfilacionGradiente(RealzadorAfilacion):
         
         return resultado.astype(tipo_original)
 
-
+@registrar_en("realzado")
 class AfilacionWavelet(RealzadorAfilacion):
     """
         Afilación multiescala usando transformada wavelet.

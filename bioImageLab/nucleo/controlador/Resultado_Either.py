@@ -27,6 +27,27 @@ class ErrorPipeline:
             causa=self.causa
         )
 
+# Para los logs de error o exito:
+class NivelLog(Enum):
+    INFO = "info"
+    ERROR = "error"
+
+@dataclass(frozen=True)
+class LogEvento:
+    etapa: str
+    mensaje: str
+    nivel: NivelLog
+    metadata: Dict[str, Any] = None
+    timestamp: str = datetime.utcnow().isoformat()
+
+    def to_dict(self) -> dict:
+        return {
+            "etapa": self.etapa,
+            "mensaje": self.mensaje,
+            "metadata": self.metadata or {}
+        }
+
+# La idea de esta arquitectura es que quede a la Haskell de: Resultado = Either + Writer, o sea un  WriterT [Log] (Either Error) a
 class Resultado(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
     """
         Either Result para pipeline de bioimágenes, con el comportamiento de encadenamiento de Monada
@@ -68,19 +89,26 @@ class Resultado(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
                 return result  # type: ignore
             result = result.map(f)
         return result  # type: ignore
+
+    def log(self, evento: LogEvento) -> Resultado[T, E]:
+        if isinstance(self, Ok):
+            return Ok(self._value, self._log + (evento,))
+        else:
+            return Err(self._error, self._log + (evento,))
     
     def tap(self, f: Callable[[T], None]) -> Resultado[T, E]: # Para hacer logging.
         """
             Efecto secundario sin alterar el flujo (logging, debug)
         """
         if self.es_ok():
-            f(self.unwrap())  # type: ignore
-        return self  # type: ignore
+            f(self.unwrap())
+        return self
 
 
 @dataclass(frozen=True)
 class Ok(Resultado[T, E]):
     _value: T  # privado por convención
+    _log: tuple[LogEvento, ...] = () 
 
     @property
     def value(self) -> T:
@@ -94,16 +122,21 @@ class Ok(Resultado[T, E]):
 
     def map(self, f: Callable[[T], U]) -> Resultado[U, E]:# Transforma si es OK
         try:
-            return Ok(f(self._value))
+            return Ok(f(self._value), self._log)
         except Exception as e:
             # Nota: Aquí convertir 'e' al tipo 'E' esperado
-            return Err(e)  # type: ignore
+            return Err(e, self._log)  # type: ignore
 
     def bind(self, f: Callable[[T], Resultado[U, E]]) -> Resultado[U, E]: # Transfforma, pero si viene de Result (aplanar la estructura). Encadenado si hay fallo
-        return f(self._value)
+        resultado = f(self._value)
+
+        if isinstance(resultado, Ok):
+            return Ok(resultado._value, self._log + resultado._log)
+        else:
+            return Err(resultado._error, self._log + resultado._log)
 
     def map_err(self, f: Callable[[E], F]) -> Resultado[T, F]:
-        return Ok(self._value)  # Ignora transformación de error
+        return Ok(self._value, self._log)  # Ignora transformación de error
 
     def unwrap(self) -> T:
         return self._value
@@ -113,11 +146,15 @@ class Ok(Resultado[T, E]):
 
     def unwrap_or_else(self, f: Callable[[E], T]) -> T:
         return self._value
+    
+    def agregar_log(self, mensaje: str) -> Ok[T, E]:
+        return Ok(self._value, self._log + (mensaje,))
 
 
 @dataclass(frozen=True)
 class Err(Resultado[T, E]):
     _error: E
+    _log: tuple[LogEvento, ...] = ()
 
     @property
     def error(self) -> E:
@@ -130,16 +167,16 @@ class Err(Resultado[T, E]):
         return True
 
     def map(self, f: Callable[[T], U]) -> Resultado[U, E]:
-        return Err(self._error)  # Propaga error sin ejecutar f
+        return Err(self._error, self._log)  # Propaga error sin ejecutar f
 
     def bind(self, f: Callable[[T], Resultado[U, E]]) -> Resultado[U, E]:
-        return Err(self._error)  # Propaga error sin ejecutar f
+        return Err(self._error, self._log)
 
     def map_err(self, f: Callable[[E], F]) -> Resultado[T, F]:
         try:
-            return Err(f(self._error))
+            return Err(f(self._error), self._log)
         except Exception as e:
-            return Err(e)  # type: ignore
+            return Err(e, self._log)  # type: ignore
 
     def unwrap(self) -> T:
         if isinstance(self._error, Exception):
@@ -152,6 +189,9 @@ class Err(Resultado[T, E]):
     def unwrap_or_else(self, f: Callable[[E], T]) -> T:
         return f(self._error)
 
+    def agregar_log(self, mensaje: str) -> Err[T, E]:
+        return Err(self._error, self._log + (mensaje,))
+        
 # Simular Do-Notation de Haskell
 def result_do(func: Callable[..., Generator[Resultado[Any, E], Any, Resultado[T, E]]]) -> Callable[..., Resultado[T, E]]:
     def wrapper(*args, **kwargs) -> Resultado[T, E]:

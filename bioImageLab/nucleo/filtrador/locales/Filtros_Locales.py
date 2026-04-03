@@ -50,7 +50,7 @@ class FiltroLocal:
         if img.ndim != 2:
             raise ValueError(f"La imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-
+@registrar_en("filtrado")
 class Gaussiano(FiltroLocal):
     """
     Filtro gaussiano para suavizado espacial general.
@@ -130,7 +130,7 @@ class Gaussiano(FiltroLocal):
         self._validar_imagen(img)
         return cv2.GaussianBlur(img, self.mascara, self.sigma)
 
-
+@registrar_en("filtrado")
 class Mediana(FiltroLocal):
     """
         Filtro de mediana para eliminación de ruido impulsivo.
@@ -198,7 +198,7 @@ class Mediana(FiltroLocal):
         self._validar_imagen(img)
         return cv2.medianBlur(img, self.mascara)
 
-
+@registrar_en("filtrado")
 class CajaBlur(FiltroLocal):
     """
         Filtro de caja (promedio uniforme) para suavizado rápido.
@@ -249,7 +249,7 @@ class CajaBlur(FiltroLocal):
         # cv2.blur es el alias para el filtro de caja normalizado
         return cv2.blur(img, self.mascara)
 
-
+@registrar_en("filtrado")
 class Bilateral(FiltroLocal):
     """
         Filtro bilateral para suavizado preservando bordes.
@@ -337,7 +337,7 @@ class Bilateral(FiltroLocal):
                 self.sigma_espacio
             )
 
-
+@registrar_en("filtrado")
 class DifusionAnisotropica(FiltroLocal):
     """
         Filtro de difusión anisotrópica para suavizado adaptativo.

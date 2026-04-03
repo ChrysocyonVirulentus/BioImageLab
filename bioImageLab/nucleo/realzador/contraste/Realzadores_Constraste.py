@@ -64,7 +64,7 @@ class RealzadorContraste:
         if img.ndim != 2:
             raise ValueError(f"La imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-
+@registrar_en("realzado")
 class CLAHE(RealzadorContraste):
     """
         Contrast Limited Adaptive Histogram Equalization.
@@ -174,7 +174,7 @@ class CLAHE(RealzadorContraste):
                 "Use normalizador.py para convertir a uint8/uint16 primero."
             )
 
-
+@registrar_en("realzado")
 class Gamma(RealzadorContraste):
     """
         Corrección Gamma para ajuste no lineal de brillo y contraste.
@@ -261,7 +261,7 @@ class Gamma(RealzadorContraste):
             img_float = img.astype(np.float64)
             return np.power(img_float, self.gamma).astype(img.dtype)
 
-
+@registrar_en("realzado")
 class Logaritmico(RealzadorContraste):
     """
         Transformación logarítmica para compresión de rango dinámico.
@@ -356,7 +356,7 @@ class Logaritmico(RealzadorContraste):
         
         return img_log.astype(img.dtype)
 
-
+@registrar_en("realzado")
 class Retinex(RealzadorContraste):
     """
         Algoritmo Retinex para corrección de iluminación desigual.
@@ -471,7 +471,7 @@ class Retinex(RealzadorContraste):
         
         return retinex_final.astype(img.dtype)
 
-
+@registrar_en("realzado")
 class EcualizacionHistograma(RealzadorContraste):
     """
         Ecualización de histograma global para distribución uniforme de intensidades.
