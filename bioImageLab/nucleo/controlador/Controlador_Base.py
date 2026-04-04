@@ -7,8 +7,9 @@ from typing import Callable, Optional, Dict, Any, TypeVar, Generic
 from .Resultado_Either import Resultado, Ok, Err
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Registro_Metodos import registro_metodos
-from ..gestorLab.Operacion import Operacion, TipoSalida
-from ..gestorLab.Categoria_Operacion import CategoriaOperacion
+from ..gestorLab.Operacion import Operacion
+from ..gestorLab.Categoria_Operacion import CategoriaOperacion, TipoDato
+from ..gestorLab.Validaciones_Operaciones import tipo_salida as tipo_salida_cat
 
 TEntrada = TypeVar("TEntrada")
 TSalida  = TypeVar("TSalida")
@@ -90,6 +91,32 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
     # =========================================================
     # CORE INTERNO
     # =========================================================
+
+    def _inferir_tipo_salida_real(self, categoria: CategoriaOperacion):
+        mapping = {
+            CategoriaOperacion.PREPROCESAMIENTO: BioImagenData,
+            CategoriaOperacion.FILTRACION: BioImagenData,
+            CategoriaOperacion.REALZADOR: BioImagenData,
+            CategoriaOperacion.TRANSFORMADOR: BioImagenData,
+            CategoriaOperacion.SEGMENTADOR: BioImagenData,  # o np.ndarray si separás máscara
+            CategoriaOperacion.CUANTIFICADOR: object,  # DataFrame
+            CategoriaOperacion.MODELADOR: object,
+            CategoriaOperacion.ANALIZADOR: object,
+        }
+        return mapping.get(categoria, object)
+
+    def _inferir_tipo_entrada_real(self, categoria: CategoriaOperacion):
+        mapping = {
+            CategoriaOperacion.PREPROCESAMIENTO: BioImagenData,
+            CategoriaOperacion.FILTRACION: BioImagenData,
+            CategoriaOperacion.REALZADOR: BioImagenData,
+            CategoriaOperacion.TRANSFORMADOR: BioImagenData,
+            CategoriaOperacion.SEGMENTADOR: BioImagenData,  # o np.ndarray si separás máscara
+            CategoriaOperacion.CUANTIFICADOR: BioImagenData,  # DataFrame
+            CategoriaOperacion.MODELADOR: object,
+            CategoriaOperacion.ANALIZADOR: object,
+        }
+        return mapping.get(categoria, object)
 
     def _ejecutar(
         self,
@@ -208,9 +235,16 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
             nombre               = nombre or f"{self._etapa}_{nombre_metodo}",
             categoria            = categoria,
             instancia_callable   = callable_,
+            
+            # NUEVO CONTRATO DE TIPOS (DEFAULT)
+            tipo_entrada         = self._inferir_tipo_entrada_real(categoria), 
+            tipo_salida_real = self._inferir_tipo_salida_real(categoria),  # default imagen → imagen
+            
             canal_objetivo       = canal,
             parametros_originales= params or {},
-            tipo_salida          = tipo_salida,
+
+            # ahora alineado con sistema semántico
+            tipo_salida          = tipo_salida_cat(categoria),
         )
 
     # YAML / dinámico (sin crear Operacion, sólo el callable)

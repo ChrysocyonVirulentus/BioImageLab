@@ -80,3 +80,25 @@ class Pipeline:
     def __repr__(self) -> str:
         splits = f" [splits: {self.puntos_split}]" if self.puntos_split else ""
         return f"Pipeline({self.nombre})[{len(self)} ops]{splits}"
+
+def validar_pipeline(operaciones: List[Operacion]):
+    errores = []
+
+    for i in range(len(operaciones) - 1):
+        actual = operaciones[i]
+        siguiente = operaciones[i + 1]
+
+        cat1 = actual.categoria
+        cat2 = siguiente.categoria
+
+        # 1. Orden
+        if not cat1.puede_preceder_a(cat2):
+            errores.append(f"{cat1} no puede preceder a {cat2}")
+
+        # 2. Dependencias
+        ok, errs = cat2.validar_dependencias({op.categoria for op in operaciones[:i+1]})
+        errores.extend(errs)
+
+        # 3. Tipos
+        if not cat1.es_compatible(cat2):
+            adaptador = cat1.obtener_adaptador(cat2)

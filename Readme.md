@@ -93,6 +93,15 @@ pip3 install -r requirements.txt
 │     (Comunicar)       │ Plots, histogramas, heatmaps,         │
 │                       │ export a CSV/Excel, reportes PDF       │
 └─────────────────────────────────────────────────────────────┘
+
+Controlador       _requiere_estrategia  _preprocesar  _validar_salida   _postprocesar
+─────────────────────────────────────────────────────────────────────────────────────
+Filtrador         base  (True)          base (2D)     base (2D==2D)     base
+Realzador         base  (True)          base (2D)     base (2D==2D)     base
+Normalizador      base  (True)          4D override   4D==4D override   base
+Segmentador       base  (True)          base (2D)     multi-shape       squeeze+uint16
+Transformador     base  (True)          base (2D)     shape-libre       base
+Cuantificador     False override        4D override   DataFrame check   base (pasa-directo)
 ```
 ```bash
 nucleo/

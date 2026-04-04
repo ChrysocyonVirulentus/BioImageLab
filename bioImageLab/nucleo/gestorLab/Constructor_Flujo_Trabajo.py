@@ -1,130 +1,159 @@
-# gestorLab/Constructor_Flujo_Trabajo.py
+# === gestorLab/Constructor_Flujo_Trabajo.py ===
 
 from __future__ import annotations
 
-import yaml
-from typing import List, Callable
+from typing import Dict, Any
+from ..controlador.Controlador_BioImagen import BioImagenData
+from ..gestorLab.Flujo_Trabajo import FlujoTrabajo
+from ..gestorLab.Categoria_Operacion import CategoriaOperacion
+from ..gestorLab.Validaciones_Operaciones import es_compatible, obtener_adaptador
+from ..gestorLab.Registro_Controladores import CONTROLADORES
 
-from .Operacion import Operacion
-from .Registro_Controladores import obtener_controlador
-from ..controlador.Resultado_Either import Resultado, Ok
-from .Categoria_Operacion import CategoriaOperacion
-from Log import guardar_log
 
-class Constructor_Flujo_Trabajo:
+class ConstructorFlujoTrabajo:
 
     def __init__(self):
-        self._operaciones: List[Operacion] = []
+        self.pipeline = None
 
     # =========================================================
-    # BUILD DESDE YAML
+    # API PRINCIPAL
     # =========================================================
 
-    def desde_yaml(self, path: str) -> Callable:
-        with open(path, "r") as f:
-            config = yaml.safe_load(f)
+    def construir(self, config: Dict[str, Any]) -> FlujoTrabajo:
 
-        pipeline_cfg = config.get("pipeline", [])
+        nombre = config.get("nombre_pipeline", "Pipeline")
+        self.pipeline = FlujoTrabajo(nombre)
 
-        self._operaciones = [
-            self._crear_operacion_desde_config(op_cfg)
-            for op_cfg in pipeline_cfg
-        ]
+        nodo_actual = "input"
 
-        return self._construir_pipeline()
+        # INPUT
+        ruta = config["input"]["ruta"]
+        data = BioImagenData.desde_ruta(ruta)
+        self.pipeline.set_input(nodo_actual, data)
+
+        # ETAPAS
+        etapas = config.get("etapas", [])
+
+        for etapa in etapas:
+            nodo_actual = self._procesar_etapa(etapa, nodo_actual)
+
+        return self.pipeline
 
     # =========================================================
-    # CREACIÓN DE OPERACIONES
+    # PROCESAMIENTO DE ETAPAS
     # =========================================================
 
-    def _crear_operacion_desde_config(self, cfg: dict) -> Operacion:
-        dominio = cfg["dominio"]
-        metodo = cfg["metodo"]
-        params = cfg.get("params", {})
-        canal  = cfg.get("canal", None)
-        nombre = cfg.get("nombre", None)
+    def _procesar_etapa(self, etapa_cfg: Dict, nodo_entrada: str) -> str:
 
-        controlador = obtener_controlador(dominio)
+        for nombre_etapa, contenido in etapa_cfg.items():
 
-        return controlador.crear_operacion(
-            nombre_metodo=metodo,
-            categoria=self._inferir_categoria(dominio),
-            canal=canal,
-            nombre=nombre,
-            params=params,
+            categoria = self._mapear_categoria(nombre_etapa)
+
+            # Puede haber múltiples operaciones en una etapa
+            for op_cfg in contenido:
+                nodo_entrada = self._crear_y_conectar_operacion(
+                    op_cfg,
+                    categoria,
+                    nodo_entrada
+                )
+
+        return nodo_entrada
+
+    # =========================================================
+    # CREAR OPERACION DESDE CONTROLADOR
+    # =========================================================
+
+    def _crear_y_conectar_operacion(
+        self,
+        op_cfg: Dict,
+        categoria: CategoriaOperacion,
+        nodo_entrada: str
+    ) -> str:
+
+        nombre_metodo = op_cfg["metodo"]
+        params        = op_cfg.get("params", {})
+        dominio       = op_cfg.get("dominio") or self._inferir_dominio(categoria)
+
+        controlador = CONTROLADORES[dominio]
+
+        operacion = controlador.crear_operacion(
+            nombre_metodo = nombre_metodo,
+            categoria     = categoria,
+            params        = params,
+            canal         = op_cfg.get("canal"),
         )
 
-    def _inferir_categoria(self, dominio: str):        
+        # VALIDACIÓN SEMÁNTICA
+        self._validar_conexion(nodo_entrada, operacion)
 
-        mapa = {
-            "filtrado": CategoriaOperacion.FILTRACION,
-            "normalizacion": CategoriaOperacion.PREPROCESAMIENTO,
+        nodo_salida = f"{nodo_entrada}_{operacion.nombre}"
+
+        self.pipeline.agregar_operacion(
+            nodo_entrada,
+            nodo_salida,
+            operacion
+        )
+
+        return nodo_salida
+
+    # =========================================================
+    # VALIDACIÓN (usa tu sistema semántico)
+    # =========================================================
+
+    def _validar_conexion(self, nodo_entrada: str, operacion):
+
+        if nodo_entrada not in self.pipeline.nodos:
+            return
+
+        nodo = self.pipeline.nodos[nodo_entrada]
+
+        if nodo.categoria is None:
+            return
+
+        cat_prev = nodo.categoria
+        cat_next = operacion.categoria
+
+        # ORDEN
+        if not cat_prev.puede_preceder_a(cat_next):
+            raise ValueError(
+                f"Orden inválido: {cat_prev} → {cat_next}"
+            )
+
+        # TIPOS (semántico)
+        if not es_compatible(cat_prev, cat_next):
+
+            adaptador = obtener_adaptador(cat_prev, cat_next)
+
+            if adaptador is None:
+                raise ValueError(
+                    f"Incompatibilidad sin adaptador: "
+                    f"{cat_prev} → {cat_next}"
+                )
+            else:
+                print(f"[WARN] Adaptador requerido: {adaptador}")
+
+    # =========================================================
+    # HELPERS
+    # =========================================================
+
+    def _mapear_categoria(self, nombre: str) -> CategoriaOperacion:
+
+        mapping = {
+            "preprocesamiento": CategoriaOperacion.PREPROCESAMIENTO,
+            "filtracion": CategoriaOperacion.FILTRACION,
             "realzado": CategoriaOperacion.REALZADOR,
             "transformacion": CategoriaOperacion.TRANSFORMADOR,
-            "segmentacion": CategoriaOperacion.SEGMENTACION,
-            "analisis": CategoriaOperacion.ANALISIS,
+            "segmentacion": CategoriaOperacion.SEGMENTADOR,
+            "cuantificacion": CategoriaOperacion.CUANTIFICADOR,
+            "modelado": CategoriaOperacion.MODELADOR,
+            "analisis": CategoriaOperacion.ANALIZADOR,
         }
 
-        return mapa.get(dominio, CategoriaOperacion.OTROS)
+        return mapping[nombre]
 
-    # =========================================================
-    # CONSTRUCCIÓN DEL PIPELINE
-    # =========================================================
-
-    def _construir_pipeline(self) -> Callable:
-
-        def pipeline(data):
-
-            resultado: Resultado = Ok(data)
-
-            for op in self._operaciones:
-                resultado = resultado.bind(op.ejecutar)
-
-                if resultado.es_err():
-                    break
-
-            return resultado
-
-        return pipeline
-
-    def validar_pipeline(self):
-
-        errores = []
-
-        tipo_actual = None
-
-        for op in self._operaciones:
-            if tipo_actual and not issubclass(tipo_actual, op.tipo_entrada):
-                errores.append(...)
-            tipo_actual = op.tipo_salida_real
-
-        return errores
-
-    def _ejecutar_con_validacion(self, op, data):
-
-        tipo_actual = type(data)
-
-        if not issubclass(tipo_actual, op.tipo_entrada):
-            return Err(ErrorBioImagen(
-                etapa="pipeline",
-                mensaje=(
-                    f"Tipo inválido: {tipo_actual.__name__} → "
-                    f"{op.tipo_entrada.__name__} en '{op.nombre}'"
-                )
-            ))
-
-        return op.ejecutar(data)
-    # =========================================================
-    # LOGGING
-    # =========================================================
-
-    def guardar_log(self, resultado: Resultado, path: str = "pipeline.log"):
-        from ..logging.Log import guardar_log
-
-        guardar_log(resultado, path)
-
-    # =========================================================
-
-    def __repr__(self):
-        ops = " → ".join(op.nombre for op in self._operaciones)
-        return f"<Pipeline {ops}>"
+    def _inferir_dominio(self, categoria: CategoriaOperacion) -> str:
+        """
+        Default simple: categoria → dominio
+        (podés hacerlo más sofisticado después)
+        """
+        return categoria.name.lower()

@@ -389,7 +389,7 @@ class ReduccionDimensionalidad:
         if np.isnan(X).any():
             raise ValueError("X contiene NaN. Imputar antes de reducir.")
 
-
+@registrar_en("modelado")
 class PCA(ReduccionDimensionalidad):
     """
     Análisis de Componentes Principales via sklearn.decomposition.PCA.
@@ -534,7 +534,7 @@ class PCA(ReduccionDimensionalidad):
             columns=cols,
         )
 
-
+@registrar_en("modelado")
 class UMAP(ReduccionDimensionalidad):
     """
     Uniform Manifold Approximation and Projection (McInnes et al. 2018).
@@ -649,7 +649,7 @@ class UMAP(ReduccionDimensionalidad):
         X_e = self._pca_prep.transform(X) if self._pca_prep else X
         return self._modelo.transform(X_e)
 
-
+@registrar_en("modelado")
 class tSNE(ReduccionDimensionalidad):
     """
     t-distributed Stochastic Neighbor Embedding (van der Maaten & Hinton 2008).

@@ -99,7 +99,7 @@ class Controlador_Transformador(Controlador_Base):
 
     def __init__(self):
         # dominio="transformacion" debe coincidir con @registrar_en("transformacion")
-        super().__init__(etapa="transformacion", dominio="transformacion")
+        super().__init__(etapa="procesamiento", dominio="transformacion")
         self._ultimo_metodo: Optional[MetodoTransformador] = None
 
     # =========================================================
