@@ -42,7 +42,7 @@ from scipy.ndimage import distance_transform_edt, label, find_objects
 from skimage import morphology, segmentation, measure
 from skimage.feature import peak_local_max
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class SegmentadorInstancial:
     """

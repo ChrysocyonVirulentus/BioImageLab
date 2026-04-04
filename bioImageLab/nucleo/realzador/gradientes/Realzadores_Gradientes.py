@@ -41,7 +41,7 @@ from typing import Optional, Tuple, Literal, Union
 from scipy.ndimage import gaussian_filter, convolve
 from scipy.signal import convolve2d
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class DetectorGradiente:
     """

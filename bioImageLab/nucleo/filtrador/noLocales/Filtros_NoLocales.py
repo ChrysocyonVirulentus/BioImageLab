@@ -30,6 +30,7 @@ import numpy as np
 import cv2
 from typing import Optional, Literal
 import warnings
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class FiltroNoLocal:
     """

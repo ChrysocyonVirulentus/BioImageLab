@@ -29,7 +29,7 @@ from scipy import ndimage
 from scipy.spatial.distance import cdist
 from skimage import measure
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class CuantificadorMorfometrico:
     """Clase base para cuantificadores morfométricos."""

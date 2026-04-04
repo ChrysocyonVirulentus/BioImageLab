@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from typing import Dict, Any
-from ..controlador.Controlador_BioImagen import BioImagenData
-from ..gestorLab.Flujo_Trabajo import FlujoTrabajo
-from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Validaciones_Operaciones import es_compatible, obtener_adaptador
-from ..gestorLab.Registro_Controladores import CONTROLADORES
+from .Flujo_Trabajo import FlujoTrabajo
+from .Categoria_Operacion import CategoriaOperacion
+from .Validacion_Operacion import es_compatible, obtener_adaptador
+from .Registro_Controladores import CONTROLADORES
 
 
 class ConstructorFlujoTrabajo:
@@ -26,10 +25,13 @@ class ConstructorFlujoTrabajo:
 
         nodo_actual = "input"
 
-        # INPUT
-        ruta = config["input"]["ruta"]
-        data = BioImagenData.desde_ruta(ruta)
-        self.pipeline.set_input(nodo_actual, data)
+        # INPUT (solo nodo estructural)
+        self.pipeline.set_input(nodo_actual)
+
+        # Guardar metadata opcional
+        self.pipeline.metadata = {
+            "input_config": config.get("input", {})
+        }
 
         # ETAPAS
         etapas = config.get("etapas", [])
@@ -49,7 +51,6 @@ class ConstructorFlujoTrabajo:
 
             categoria = self._mapear_categoria(nombre_etapa)
 
-            # Puede haber múltiples operaciones en una etapa
             for op_cfg in contenido:
                 nodo_entrada = self._crear_y_conectar_operacion(
                     op_cfg,
@@ -97,7 +98,7 @@ class ConstructorFlujoTrabajo:
         return nodo_salida
 
     # =========================================================
-    # VALIDACIÓN (usa tu sistema semántico)
+    # VALIDACIÓN
     # =========================================================
 
     def _validar_conexion(self, nodo_entrada: str, operacion):
@@ -119,7 +120,7 @@ class ConstructorFlujoTrabajo:
                 f"Orden inválido: {cat_prev} → {cat_next}"
             )
 
-        # TIPOS (semántico)
+        # TIPOS
         if not es_compatible(cat_prev, cat_next):
 
             adaptador = obtener_adaptador(cat_prev, cat_next)
@@ -152,8 +153,4 @@ class ConstructorFlujoTrabajo:
         return mapping[nombre]
 
     def _inferir_dominio(self, categoria: CategoriaOperacion) -> str:
-        """
-        Default simple: categoria → dominio
-        (podés hacerlo más sofisticado después)
-        """
         return categoria.name.lower()

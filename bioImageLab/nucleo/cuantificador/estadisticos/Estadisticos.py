@@ -31,7 +31,7 @@ from scipy import stats
 from scipy.stats import kurtosis, skew, iqr as scipy_iqr
 from collections import defaultdict
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class CuantificadorEstadistico:
     """Clase base para cuantificadores estadísticos."""

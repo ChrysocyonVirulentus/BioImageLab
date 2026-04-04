@@ -11,7 +11,7 @@ from .Controlador_Base import Controlador_Base
 from .Resultado_Either import Resultado
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Operacion import Operacion, TipoSalida
+from ..gestorLab.Operacion import Operacion, TipoDato
 
 # Estrategias — mismas que usa el filtrador, sin override
 from .Estrategias_Aplicacion import (

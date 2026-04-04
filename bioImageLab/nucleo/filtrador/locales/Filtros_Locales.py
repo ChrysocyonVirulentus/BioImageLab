@@ -22,6 +22,8 @@ import cv2
 import numpy as np
 import warnings
 from typing import Tuple
+from ...gestorLab.Registro_Metodos import registrar_en
+
 
 
 class FiltroLocal:

@@ -45,7 +45,7 @@ IMPORTANTE - Separación de responsabilidades:
 import numpy as np
 from typing import Optional, Tuple, Union
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 # Clase base
 

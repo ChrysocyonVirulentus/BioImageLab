@@ -49,7 +49,7 @@ IMPORTANTE - Separación de responsabilidades:
 import numpy as np
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 # Clase base
 
@@ -180,7 +180,7 @@ class CuantificadorTextura:
 
 # GLCM — Matriz de Co-ocurrencia de Niveles de Gris
 @registrar_en("cuantificacion")
-class GLCM(CuantificadorTextura):
+class GrayLevelCoocurrenceMatrix(CuantificadorTextura):
     """
         Matriz de Co-ocurrencia de Niveles de Gris (Gray-Level Co-occurrence Matrix).
 
@@ -696,7 +696,7 @@ class CaracteristicasHaralick(CuantificadorTextura):
 
 # LBP — Local Binary Pattern
 @registrar_en("cuantificacion")
-class LBP(CuantificadorTextura):
+class LocalBinaryPattern(CuantificadorTextura):
     """
         Patron Binario Local (Local Binary Pattern) dentro de la máscara.
 
@@ -1055,7 +1055,7 @@ class FiltrosGabor(CuantificadorTextura):
 
 # GLRLM — Matriz de Longitud de Corrida
 @registrar_en("cuantificacion")
-class GLRLM(CuantificadorTextura):
+class GrayLevelRunLengthMatrix(CuantificadorTextura):
     """
         Matriz de Longitud de Corrida de Niveles de Gris (Gray-Level Run-Length Matrix).
 

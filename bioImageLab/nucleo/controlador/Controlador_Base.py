@@ -9,7 +9,7 @@ from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Registro_Metodos import registro_metodos
 from ..gestorLab.Operacion import Operacion
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion, TipoDato
-from ..gestorLab.Validaciones_Operaciones import tipo_salida as tipo_salida_cat
+from ..gestorLab.Validacion_Operacion import tipo_salida as tipo_salida_cat
 
 TEntrada = TypeVar("TEntrada")
 TSalida  = TypeVar("TSalida")
@@ -189,7 +189,7 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         """
         Aplica el método sobre TODOS los canales secuencialmente.
         Sólo tiene sentido para IMAGEN → IMAGEN (el _postprocesar reinserta).
-        Para otros TipoSalida usar crear_operador con canal explícito.
+        Para otros TipoDato usar crear_operador con canal explícito.
         """
         self._ultimo_metodo = metodo
 
@@ -217,7 +217,7 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         canal: Optional[int] = None,        # None = multicanal
         nombre: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
-        tipo_salida: TipoSalida = TipoSalida.IMAGEN,
+        tipo_salida: TipoDato = TipoDato.IMAGEN,
     ) -> Operacion:
         """
         Construye una Operacion lista para el pipeline builder.

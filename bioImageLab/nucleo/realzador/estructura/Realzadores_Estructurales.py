@@ -36,7 +36,7 @@ from typing import Optional, Tuple, List, Union
 from scipy.ndimage import gaussian_filter
 from skimage.feature import hessian_matrix, hessian_matrix_eigvals
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class RealzadorEstructural:
     """

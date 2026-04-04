@@ -17,7 +17,7 @@ from .Controlador_Base import Controlador_Base
 from .Resultado_Either import Resultado
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Operacion import Operacion, TipoSalida
+from ..gestorLab.Operacion import Operacion, TipoDato
 
 # Métodos
 from ..cuantificador.intensidad.Cuantificadores_Intensidad import (
@@ -25,18 +25,20 @@ from ..cuantificador.intensidad.Cuantificadores_Intensidad import (
     MedianaIntensidad, DesviacionEstandar, CoeficienteVariacion, PercentilIntensidad,
     RelacionSenialRuido, AsimetriaIntensidad, CurtosisIntensidad, PerfilLineal,
 )
-from ..cuantificador.morfometria.Cuantificadores_Morfometria import (
-    GeometricasBasicas, Forma, Escala, Orientacion, IntensidadForma,
+from ..cuantificador.morfometria.Cuantificadores_Morfometricos import (
+    Concavidad, Forma, Convexidad, Orientacion, Compactacion, Circularidad,
+    Excentricidad, DiametroEquivalente, CajaFrontera, Centroide, Perimetro,
+    Area,
 )
 from ..cuantificador.topologicos.Cuantificadores_Topologicos import (
-    Esqueleticas, Ramificacion, Contornos, Conectividad,
-    IndiceBetti, GrafoAdyacencia, DistanciaGeodesica,
+    MetricasEsqueleticas, Contornos, Conectividad
 )
-from ..cuantificador.textura.Cuantificadores_Textura import (
-    GLCM, CaracteristicasHaralick, LBP, FiltrosGabor, GLRLM, EnergiaLaws,
+from ..cuantificador.texturas.Cuantificadores_Texturas import (
+    GrayLevelCoocurrenceMatrix, CaracteristicasHaralick, 
+    LocalBinaryPattern, FiltrosGabor, GrayLevelRunLengthMatrix, EnergiaLaws,
 )
 from ..cuantificador.estadisticos.Estadisticos import (
-    Estadisticos, Distribuciones, Correlaciones,
+    EstadisticosDescriptivos, Distribuciones, Correlaciones,
 )
 
 
@@ -46,17 +48,19 @@ MetodoIntensidad = Union[
     RelacionSenialRuido, AsimetriaIntensidad, CurtosisIntensidad, PerfilLineal,
 ]
 MetodoMorfometria = Union[
-    GeometricasBasicas, Forma, Escala, Orientacion, IntensidadForma,
+    Concavidad, Forma, Convexidad, Orientacion, Compactacion, Circularidad,
+    Excentricidad, DiametroEquivalente, CajaFrontera, Centroide, Perimetro,
+    Area,
 ]
 MetodoTopologico = Union[
-    Esqueleticas, Ramificacion, Contornos, Conectividad,
-    IndiceBetti, GrafoAdyacencia, DistanciaGeodesica,
+    MetricasEsqueleticas, Contornos, Conectividad,
 ]
 MetodoTextura = Union[
-    GLCM, CaracteristicasHaralick, LBP, FiltrosGabor, GLRLM, EnergiaLaws,
+    GrayLevelCoocurrenceMatrix, CaracteristicasHaralick, LocalBinaryPattern, 
+    FiltrosGabor, GrayLevelRunLengthMatrix, EnergiaLaws,
 ]
 MetodoEstadistico = Union[
-    Estadisticos, Distribuciones, Correlaciones,
+    EstadisticosDescriptivos, Distribuciones, Correlaciones,
 ]
 MetodoCuantificador = Union[
     MetodoIntensidad, MetodoMorfometria, MetodoTopologico,
@@ -163,7 +167,7 @@ class Controlador_Cuantificador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params=params,
-            tipo_salida=TipoSalida.TABLA,
+            tipo_salida=TipoDato.TABLA,
         )
 
     # =========================================================
@@ -262,12 +266,75 @@ class Controlador_Cuantificador(Controlador_Base):
 
     # ── MORFOMETRÍA ───────────────────────────────────────────
 
-    def crear_operacion_geometricas_basicas(
+    def crear_operacion_perimetro(
         self,
         canal: Optional[int] = 0,
         nombre: Optional[str] = None,
     ) -> Operacion:
-        return self._operacion("geometricas_basicas", canal, nombre, {})
+        return self._operacion("perimetro", canal, nombre, {})
+
+    def crear_operacion_excentricidad(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("excentricidad", canal, nombre, {})
+
+    def crear_operacion_concavidad(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("excentricidad", canal, nombre, {})
+    
+    def crear_operacion_convexidad(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("convexidad", canal, nombre, {})
+
+    def crear_operacion_compactacion(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("compactacion", canal, nombre, {})
+
+    def crear_operacion_circularidad(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("circularidad", canal, nombre, {})
+
+    def crear_operacion_area(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("area", canal, nombre, {})
+
+    def crear_operacion_diametro_equivalente(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("diametro_equivalente", canal, nombre, {})
+
+    def crear_operacion_caja_frontera(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("caja_frontera", canal, nombre, {})
+
+    def crear_operacion_centroide(
+        self,
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self._operacion("centroide", canal, nombre, {})
 
     def crear_operacion_forma(
         self,
@@ -276,13 +343,6 @@ class Controlador_Cuantificador(Controlador_Base):
     ) -> Operacion:
         return self._operacion("forma", canal, nombre, {})
 
-    def crear_operacion_escala(
-        self,
-        # TODO: params (pixel_size_xy, pixel_size_z, unidad)
-        canal: Optional[int] = 0,
-        nombre: Optional[str] = None,
-    ) -> Operacion:
-        return self._operacion("escala", canal, nombre, {})
 
     def crear_operacion_orientacion(
         self,
@@ -291,12 +351,6 @@ class Controlador_Cuantificador(Controlador_Base):
     ) -> Operacion:
         return self._operacion("orientacion", canal, nombre, {})
 
-    def crear_operacion_intensidad_forma(
-        self,
-        canal: Optional[int] = 0,
-        nombre: Optional[str] = None,
-    ) -> Operacion:
-        return self._operacion("intensidad_forma", canal, nombre, {})
 
     # ── TOPOLÓGICOS ───────────────────────────────────────────
 

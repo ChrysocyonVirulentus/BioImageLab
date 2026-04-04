@@ -7,7 +7,7 @@ from ..controlador.Resultado_Either import Resultado, Err
 from ..controlador.Controlador_BioImagen import ErrorBioImagen
 
 from .Categoria_Operacion import CategoriaOperacion, TipoDato
-from .Validaciones_Operaciones import (
+from .Validacion_Operacion import (
     es_compatible,
     requiere_adaptador,
     obtener_adaptador,

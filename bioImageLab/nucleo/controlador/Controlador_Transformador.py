@@ -11,7 +11,7 @@ from .Controlador_Base import Controlador_Base
 from .Resultado_Either import Resultado
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Operacion import Operacion, TipoSalida
+from ..gestorLab.Operacion import Operacion, TipoDato
 
 # Estrategias
 from .Estrategias_Aplicacion import (
@@ -42,9 +42,7 @@ from ..transformador.integrales.Transformadores_Proyectivos import (
     Radon,
     IntegralDeLinea,
     Hough,
-    TransformadaDistanciaGeodesica,
     TransformadaHilbert,
-    Abel,
 )
 
 
@@ -58,8 +56,7 @@ MetodoEspectral = Union[
 ]
 
 MetodoProyectivo = Union[
-    Radon, IntegralDeLinea, Hough,
-    TransformadaDistanciaGeodesica, TransformadaHilbert, Abel,
+    Radon, IntegralDeLinea, Hough, TransformadaHilbert,
 ]
 
 MetodoTransformador = Union[
@@ -79,22 +76,22 @@ class Controlador_Transformador(Controlador_Base):
 
     Tres submódulos con comportamientos distintos:
 
-      Geométricos (Rotacion, Redimensionar, Deformar, ...):
+    Geométricos (Rotacion, Redimensionar, Deformar, ...):
         - [Y,X] → [Y,X]  mismo shape
         - Sin hooks sobreescritos
 
-      Espectrales (Fourier, Wavelet, Gabor):
+    Espectrales (Fourier, Wavelet, Gabor):
         - [Y,X] → [Y,X]  mismo shape (módulo, magnitud, o respuesta)
         - Sin hooks sobreescritos
         - Fourier devuelve float64 (módulo), no complejo
 
-      Proyectivos/Integrales (Radon, Hough, Abel, ...):
+    Proyectivos/Integrales (Radon, Hough, Abel, ...):
         - [Y,X] → shape distinto (sinograma, acumulador, proyección)
         - _validar_salida sobreescrito para permitir shape libre
-        - TipoSalida.FEATURES en lugar de IMAGEN
+        - TipoDato.FEATURES en lugar de IMAGEN
 
     Hook sobreescrito (solo uno):
-      _validar_salida → omite validación de shape para proyectivos
+        _validar_salida → omite validación de shape para proyectivos
     """
 
     def __init__(self):
@@ -147,15 +144,15 @@ class Controlador_Transformador(Controlador_Base):
         self._ultimo_metodo = metodo
         return self.crear_operador_multicanal(metodo=metodo, tipo_aplicacion=tipo)
 
-    def _tipo_salida(self, nombre_metodo: str) -> TipoSalida:
+    def _tipo_salida(self, nombre_metodo: str) -> TipoDato:
         """
         Proyectivos producen features/sinogramas, no imágenes.
-        El resto conserva TipoSalida.IMAGEN.
+        El resto conserva TipoDato.IMAGEN.
         """
         return (
-            TipoSalida.FEATURES
+            TipoDato.FEATURES
             if nombre_metodo in _PROYECTIVOS_SHAPE_LIBRE
-            else TipoSalida.IMAGEN
+            else TipoDato.IMAGEN
         )
 
     # =========================================================
@@ -178,7 +175,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_redimensionar(
@@ -195,7 +192,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_remuestreo(
@@ -212,7 +209,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_deformar(
@@ -229,7 +226,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_transformacion_distancia(
@@ -246,7 +243,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_esqueletizacion(
@@ -263,7 +260,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_eje_medial(
@@ -280,7 +277,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     # ── ESPECTRALES ───────────────────────────────────────────
@@ -299,7 +296,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_wavelet(
@@ -316,7 +313,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_gabor(
@@ -333,11 +330,11 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     # ── PROYECTIVOS / INTEGRALES ──────────────────────────────
-    # Estos devuelven TipoSalida.FEATURES — shape distinto al input
+    # Estos devuelven TipoDato.FEATURES — shape distinto al input
 
     def crear_operacion_radon(
         self,
@@ -353,7 +350,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.FEATURES,  # sinograma [n_angulos, proyeccion]
+            tipo_salida=TipoDato.FEATURES,  # sinograma [n_angulos, proyeccion]
         )
 
     def crear_operacion_integral_de_linea(
@@ -370,7 +367,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.FEATURES,
+            tipo_salida=TipoDato.FEATURES,
         )
 
     def crear_operacion_hough(
@@ -387,7 +384,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.FEATURES,  # acumulador de votos
+            tipo_salida=TipoDato.FEATURES,  # acumulador de votos
         )
 
     def crear_operacion_distancia_geodesica(
@@ -405,7 +402,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.IMAGEN,
+            tipo_salida=TipoDato.IMAGEN,
         )
 
     def crear_operacion_hilbert(
@@ -422,7 +419,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.FEATURES,
+            tipo_salida=TipoDato.FEATURES,
         )
 
     def crear_operacion_abel(
@@ -439,7 +436,7 @@ class Controlador_Transformador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params={},  # TODO
-            tipo_salida=TipoSalida.FEATURES,
+            tipo_salida=TipoDato.FEATURES,
         )
 
     # =========================================================

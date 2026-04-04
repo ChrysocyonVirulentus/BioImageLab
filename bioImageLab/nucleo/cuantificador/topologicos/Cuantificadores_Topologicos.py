@@ -18,7 +18,6 @@ IMPORTANTE - Separación de responsabilidades:
 
 Métricas disponibles:
 - Esqueléticas: longitud de esqueleto, puntos terminales, puntos de ramificación
-- Ramificación: número de ramas, orden de ramificación, ángulos de bifurcación
 - Contornos: detección, longitud, complejidad, distancias entre contornos
 - Conectividad: número de componentes, agujeros (euler characteristic)
 - Topológicas: índice de betti, grafo de adyacencia, distancia geodésica
@@ -31,7 +30,7 @@ from scipy.spatial.distance import cdist
 from skimage import measure, morphology, graph
 from collections import defaultdict
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class CuantificadorTopologico:
     """Clase base para cuantificadores topológicos."""

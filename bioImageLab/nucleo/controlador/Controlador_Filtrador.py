@@ -10,14 +10,14 @@ from .Controlador_Base import Controlador_Base
 from .Resultado_Either import Resultado
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Operacion import Operacion, TipoSalida
+from ..gestorLab.Operacion import Operacion, TipoDato
 
 # Métodos
 from ..filtrador.locales.Filtros_Locales import (
     CajaBlur, Gaussiano, Bilateral, Mediana, DifusionAnisotropica
 )
 from ..filtrador.espectrales.Filtros_Ffts import (
-    FFTPasaBajo, FFTPasaAlto, FFTPasaBanda, FFTBandStop, FiltradoNotch
+    FFTPasaBajo, FFTPasaAlto, FFTPasaBanda, FFTBandStop, FiltracionNotch
 )
 from ..filtrador.multiescala.Filtros_Multiescala import (
     DiferenciaLaplaciana, DiferenciaGaussiana, WaveletTransform, PiramideLaplaciana
@@ -40,7 +40,7 @@ from .Estrategias_Aplicacion import (
 
 MetodoFiltro = Union[
     CajaBlur, Gaussiano, Bilateral, Mediana, DifusionAnisotropica,
-    FFTPasaBajo, FFTPasaAlto, FFTPasaBanda, FFTBandStop, FiltradoNotch,
+    FFTPasaBajo, FFTPasaAlto, FFTPasaBanda, FFTBandStop, FiltracionNotch,
     DiferenciaLaplaciana, DiferenciaGaussiana, WaveletTransform, PiramideLaplaciana,
     NonLocalMeans, BlockMatching3D
 ]

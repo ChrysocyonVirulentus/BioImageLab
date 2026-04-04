@@ -40,7 +40,7 @@ from scipy.ndimage import convolve
 from scipy.signal import convolve2d, fftconvolve
 from scipy.special import j1
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class Convolucionador:
     """

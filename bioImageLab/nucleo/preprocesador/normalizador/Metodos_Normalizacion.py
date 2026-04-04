@@ -1,4 +1,5 @@
 import numpy as np 
+from ...gestorLab.Registro_Metodos import registrar_en
 
 # Funciones para normalizar
 # Se aceptan que esten en float32 o float64

@@ -18,7 +18,7 @@ IMPORTANTE - Separación de responsabilidades:
 Métodos disponibles:
 - Radon: Transformada de proyecciones (tomografía computarizada)
 - Hough: Transformada para detección de formas paramétricas (líneas, círculos)
-- TransformadaDistanciaGeodesica: Distancia a lo largo de superficie (no Euclidiana)
+- TransformadaDistanciaGeodesica: Distancia a lo largo de superficie (no Euclidiana) # NO IMPLEMENTADO
 - TransformadaHilbert: Transformada integral de Hilbert (análisis de fase)
 - Abel: Transformada para simetría cilíndrica (proyecciones axiales)
 - IntegralDeLinea : Contorno de un ojeto segun gradiente. 
@@ -31,6 +31,7 @@ from scipy import ndimage
 from skimage import transform
 from skimage.transform import radon, iradon, hough_line, hough_circle
 import warnings
+from ...gestorLab.Registro_Metodos import registrar_en
 
 
 class TransformadorProyectivo:

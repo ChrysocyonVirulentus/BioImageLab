@@ -25,6 +25,7 @@ Tipos disponibles:
 import numpy as np
 import cv2
 from typing import List, Tuple, Optional, Literal
+from ...gestorLab.Registro_Metodos import registrar_en
 import warnings
 
 

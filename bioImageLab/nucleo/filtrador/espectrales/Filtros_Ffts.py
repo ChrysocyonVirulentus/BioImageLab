@@ -303,7 +303,7 @@ class FFTBandStop(FiltroEspectral):
         return 1.0 / (1.0 + ((dist * self.ancho) / denom)**(2 * 2))
 
 @registrar_en("filtracion")
-class filtracionNotch(FiltroEspectral):
+class FiltracionNotch(FiltroEspectral):
     """
         Filtro notch para eliminación de múltiples frecuencias específicas.
         

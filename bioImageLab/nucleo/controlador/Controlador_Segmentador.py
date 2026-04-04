@@ -12,7 +12,7 @@ from .Controlador_Base import Controlador_Base
 from .Resultado_Either import Resultado
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Operacion import Operacion, TipoSalida
+from ..gestorLab.Operacion import Operacion, TipoDato
 
 # Estrategias — sin override
 from .Estrategias_Aplicacion import (
@@ -212,7 +212,7 @@ class Controlador_Segmentador(Controlador_Base):
             canal=canal,
             nombre=nombre,
             params=params,
-            tipo_salida=TipoSalida.MASCARA,
+            tipo_salida=TipoDato.MASCARA,
         )
         # Operacion es frozen → usamos replace para agregar el flag
         return replace(op, es_operacion_split=(nombre_metodo in _METODOS_SPLIT))

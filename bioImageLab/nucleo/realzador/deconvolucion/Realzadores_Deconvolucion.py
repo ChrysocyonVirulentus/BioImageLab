@@ -35,7 +35,7 @@ from scipy.fft import fft2, ifft2, fftshift, ifftshift
 from scipy.signal import convolve2d
 from skimage import restoration
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class Deconvolucionador:
     """

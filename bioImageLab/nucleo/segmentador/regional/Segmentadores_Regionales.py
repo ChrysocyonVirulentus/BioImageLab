@@ -46,7 +46,7 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 from skimage import segmentation, color, filters, graph
 from sklearn.cluster import MeanShift as SklearnMeanShift
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class segmentacionrRegional:
     """

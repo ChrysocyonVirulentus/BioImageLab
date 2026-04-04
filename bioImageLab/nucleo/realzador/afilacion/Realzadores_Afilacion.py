@@ -39,6 +39,7 @@ from typing import Optional, Tuple, Literal, Union
 from scipy.ndimage import gaussian_filter, convolve
 from skimage import restoration
 import warnings
+from ...gestorLab.Registro_Metodos import registrar_en
 
 
 class RealzadorAfilacion:

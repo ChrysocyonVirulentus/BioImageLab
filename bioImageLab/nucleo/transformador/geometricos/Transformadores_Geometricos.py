@@ -33,7 +33,7 @@ from scipy.ndimage import distance_transform_edt, map_coordinates
 from skimage import morphology, transform, measure
 from skimage.morphology import skeletonize, medial_axis, thin
 import warnings
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 class TransformadorGeometrico:
     """Clase base para transformaciones geométricas y topológicas."""
