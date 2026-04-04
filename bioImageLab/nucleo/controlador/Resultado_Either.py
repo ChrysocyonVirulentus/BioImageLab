@@ -1,6 +1,8 @@
 from __future__ import annotations # Para manejar el tipado limpio
-from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, Union, Final, Generator, Any, Iterable
+from dataclasses import dataclass, field
+from typing import Generic, Dict, TypeVar, Callable, Union, Final, Generator, Any, Iterable
+from enum import Enum
+from datetime import datetime
 from pathlib import Path
 import numpy as np
 
@@ -38,7 +40,7 @@ class LogEvento:
     mensaje: str
     nivel: NivelLog
     metadata: Dict[str, Any] = None
-    timestamp: str = datetime.utcnow().isoformat()
+    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_dict(self) -> dict:
         return {
@@ -148,7 +150,8 @@ class Ok(Resultado[T, E]):
         return self._value
     
     def agregar_log(self, mensaje: str) -> Ok[T, E]:
-        return Ok(self._value, self._log + (mensaje,))
+        evento = LogEvento(etapa=etapa, mensaje=mensaje, nivel=NivelLog.INFO)
+        return Ok(self._value, self._log + (evento,))
 
 
 @dataclass(frozen=True)

@@ -1,310 +1,258 @@
+# === normalizador/Controlador_Normalizador.py ===
 from __future__ import annotations
+
 import numpy as np
-from dataclasses import dataclass, replace
-from typing import Union, Callable, Optional, Tuple
-from enum import Enum, auto
+from typing import Union, Optional
 
-# Imports de tu sistema
-from ..preprocesador.normalizador.Metodos_Normalizacion import (
-    MetodoNormalizacion, 
-    MaxNorm, 
-    MinMaxNorm, 
-    PercentilNorm, 
-    ZScoreNorm
-)
+# Core
+from .Controlador_Base import Controlador_Base
 
-from ..preprocesador.normalizador.Metodos_CambioTipos import (
-    ToUint8,
-    ToUint16,
-    ToFloat32,
-    ToFloat64
-)
-
-from .Resultado_Either import Resultado, Err, Ok
-from .Controlador_BioImagen import (
-    BioImagenData, 
-    ErrorBioImagen
-)
+# Sistema
+from .Resultado_Either import Resultado
+from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion
-from ..gestorLab.Operacion import Operacion
+from ..gestorLab.Operacion import Operacion, TipoSalida
 
-# ESTRATEGIAS DE NORMALIZACIÓN (Tipos Algebraicos)
+# Estrategias — mismas que usa el filtrador, sin override
+from .Estrategias_Aplicacion import (
+    TipoAplicacion,
+    Global,
+    PorCorteZ,
+    PorTimepoint,
+    PorCorteEspaciotemporal,
+    PorVolumen3D,
+    ConReferencia,
+)
 
-@dataclass(frozen=True)
-class Norm_Global:
-    """Normaliza todo el volumen espacio-temporal del canal como un único conjunto de datos."""
-    pass
+# Métodos
+from ..preprocesador.normalizador.Metodos_Normalizacion import (
+    MetodoNormalizacion, MaxNorm, MinMaxNorm, PercentilNorm, ZScoreNorm,
+)
+from ..preprocesador.normalizador.Metodos_CambioTipos import (
+    ToUint8, ToUint16, ToFloat32, ToFloat64,
+)
 
-@dataclass(frozen=True)
-class Norm_PorCorteZ:
-    """
-    Normaliza cada plano Z independientemente.
-    Útil cuando la iluminación varía con la profundidad pero no entre timepoints.
-    """
-    pass
 
-@dataclass(frozen=True)
-class Norm_PorTimepoint:
-    """
-    Normaliza cada fotograma T independientemente (incluyendo todos sus Z).
-    Útil para corregir fotobleaching o cambios de iluminación en el tiempo.
-    """
-    pass
-
-@dataclass(frozen=True)
-class Norm_PorCorteEspaciotemporal:
-    """
-    Normaliza cada corte (t, z) de forma completamente independiente.
-    Máxima granularidad, útil para estabilizar señal en time-lapse largos.
-    """
-    pass
-
-TipoNormalizacion = Union[
-    Norm_Global, 
-    Norm_PorCorteZ, 
-    Norm_PorTimepoint, 
-    Norm_PorCorteEspaciotemporal
+MetodoNorm = Union[
+    MaxNorm, MinMaxNorm, PercentilNorm, ZScoreNorm,
+    ToUint8, ToUint16, ToFloat32, ToFloat64,
 ]
 
 
-# FUNCIONES PURAS
-
-def crear_normalizador(
-    tipo: TipoNormalizacion = Norm_Global(),
-    metodo: MetodoNormalizacion = MaxNorm()
-) -> Callable[[BioImagenData, int], Resultado[BioImagenData, ErrorBioImagen]]:
+class Controlador_Normalizador(Controlador_Base[BioImagenData, BioImagenData]):
     """
-    Factory curried que retorna una función pura de normalización.
-    
-    Esta es la versión recomendada para pipelines funcionales.
-    Retorna una función que puede usarse con .bind() o .map()
-    
-    Args:
-        tipo: Estrategia de normalización espacio-temporal
-        metodo: Algoritmo de normalización (MaxNorm, ZScore, etc.)
-        
-    Returns:
-        Callable[[BioImagenData, int], Resultado[BioImagenData, ErrorBioImagen]]
+    Controlador de normalización.
+
+    Idéntico al filtrador salvo dos hooks de shape:
+      _preprocesar  → devuelve (T,Z,Y,X) en lugar del 2D del base
+      _validar_salida → valida shape (T,Z,Y,X)
+
+    Sin Norm_* propios: usa TipoAplicacion de Estrategias_Aplicacion.
+    El base llama tipo_aplicacion.estrategia() — sin override necesario.
+
+    Los MetodoNorm hacen el flatten internamente si lo necesitan,
+    ya que la estrategia les pasa el bloque con el shape que corresponda:
+      Global              → metodo recibe [T, Z, Y, X]
+      PorCorteZ           → metodo recibe [T, Y, X]
+      PorTimepoint        → metodo recibe [Z, Y, X]
+      PorCorteEspaciotemporal → metodo recibe [Y, X]
+      PorVolumen3D        → metodo recibe [Z, Y, X]
     """
-    def _normalizar_canal(
-        data: BioImagenData, 
-        canal_idx: int = 0
-    ) -> Resultado[BioImagenData, ErrorBioImagen]:
-        
 
-        nombre_metodo = getattr(metodo, "nombre", metodo.__class__.__name__)
+    def __init__(self):
+        super().__init__(etapa="preprocesamiento", dominio="normalizacion")
+        self._ultimo_metodo: Optional[MetodoNorm] = None
 
-        resultado_inicial = Ok(data).log(LogEvento(
-            etapa="normalizacion",
-            mensaje=f"Iniciando {nombre_metodo}",
-            nivel=NivelLog.INFO,
-            metadata={"canal": canal_idx}
-        ))
+    # =========================================================
+    # HOOKS — solo los de shape, nada más
+    # =========================================================
 
-        # Validaciones
-        if not (0 <= canal_idx < data.dims.C):
-            return Err(ErrorBioImagen(
-                etapa="normalizacion",
-                mensaje=f"Canal {canal_idx} fuera de rango [0, {data.dims.C-1}]",
-                ruta=data.ruta_origen
-            )).log(LogEvento(
-                etapa="normalizacion",
-                mensaje="Canal fuera de rango",
-                nivel=NivelLog.ERROR,
-                metadata={"canal": canal_idx}
-            ))
-        
-        try:
-            T, Z, C, Y, X = data.dims.shape
-            
-            # Extraer canal como [T, Z, Y, X] - quitamos dimensión C
-            canal_data = data.datos[:, :, canal_idx, :, :]  # Shape: (T, Z, Y, X)
-            
-            # Preparar array de resultado manteniendo dimensión C=1
-            resultado_canal = np.zeros((T, Z, 1, Y, X), dtype=canal_data.dtype) #NOTA: Cambiar a dtype=np.float64 si falla
-            
-            # Aplicar estrategia según tipo algebraico
-            match tipo:
-                case Norm_Global():
-                    # Aplanar todo el volumen del canal: [T*Z*Y*X]
-                    flat = canal_data.reshape(-1)
-                    normalizado_flat = metodo(flat)
-                    resultado_canal[:, :, 0, :, :] = normalizado_flat.reshape(T, Z, Y, X)
-                    
-                case Norm_PorCorteZ():
-                    # Por cada Z, normalizar todo el tiempo y espacio
-                    for z in range(Z):
-                        corte_z = canal_data[:, z, :, :]  # [T, Y, X]
-                        flat_z = corte_z.reshape(-1)
-                        normalizado_z = metodo(flat_z).reshape(T, Y, X)
-                        resultado_canal[:, z, 0, :, :] = normalizado_z
-                        
-                case Norm_PorTimepoint():
-                    # Por cada T, normalizar todo Z y espacio
-                    for t in range(T):
-                        frame_t = canal_data[t, :, :, :]  # [Z, Y, X]
-                        flat_t = frame_t.reshape(-1)
-                        normalizado_t = metodo(flat_t).reshape(Z, Y, X)
-                        resultado_canal[t, :, 0, :, :] = normalizado_t
-                        
-                case Norm_PorCorteEspaciotemporal():
-                    # Cada (t, z) independiente
-                    for t in range(T):
-                        for z in range(Z):
-                            corte = canal_data[t, z, :, :]  # [Y, X]
-                            resultado_canal[t, z, 0, :, :] = metodo(corte)
-            
-            # Reconstruir BioImagenData con canal normalizado reemplazado
-            nuevos_datos = data.datos.copy() # NOTA: Agregar .astype(np.float64) si falla
-            nuevos_datos[:, :, canal_idx, :, :] = resultado_canal[:, :, 0, :, :]
-            
-            # Preservar metadatos, actualizar datos
-            return Ok(replace(data, datos=nuevos_datos)).log(LogEvento(
-                etapa="normalizacion",
-                mensaje=f"{nombre_metodo} aplicado",
-                nivel=NivelLog.INFO,
-                metadata={
-                    "canal": canal_idx,
-                    "tipo": tipo.__class__.__name__
-                }
-            ))
-            
-        except Exception as e:
-            return Err(ErrorBioImagen(
-                etapa="normalizacion",
-                mensaje=f"Fallo en {nombre_metodo}: {str(e)}",
-                ruta=data.ruta_origen,
-                causa=e
-            )).log(LogEvento(
-                etapa="normalizacion",
-                mensaje=f"Error en {nombre_metodo}",
-                nivel=NivelLog.ERROR,
-                metadata={
-                    "canal": canal_idx,
-                    "error": str(e)
-                }
-            ))
-    
-    return _normalizar_canal
+    def _preprocesar(self, data: BioImagenData, canal: int) -> np.ndarray:
+        """Devuelve (T, Z, Y, X) — el base devolvería (Y, X) 2D."""
+        return data.datos[:, :, canal, :, :].astype(np.float64)
 
+    # Para darle consistencia 4D
+    def _postprocesar(self, data, resultado, canal):
+        if not isinstance(resultado, np.ndarray):
+            return resultado
 
-def normalizar_todos_canales(
-    tipo: TipoNormalizacion = Norm_Global(),
-    metodo: MetodoNormalizacion = MaxNorm()
-) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-    """
-    Versión que normaliza todos los canales secuencialmente con la misma estrategia.
-    Útil cuando quieres aplicar el mismo criterio a todos los fluoróforos.
-    """
-    def _normalizar_todos(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
-        resultado: Resultado[BioImagenData, ErrorBioImagen] = Ok(data)
-        
-        for c in range(data.dims.C):
-            normalizador_canal = crear_normalizador(tipo, metodo)
-            resultado = resultado.bind(lambda d, canal=c: normalizador_canal(d, canal))
-            if resultado.es_err():
-                break
-                
-        return resultado
-    
-    return _normalizar_todos
+        nuevos = data.datos.copy()
+        nuevos[:, :, canal, :, :] = resultado  # (T,Z,Y,X)
+        return replace(data, datos=nuevos)
 
+    def _validar_salida(self, resultado: np.ndarray, canal_data: np.ndarray) -> None:
+        """El base compara shape 2D, aquí comparamos shape 4D."""
+        if isinstance(resultado, np.ndarray):
+            if resultado.shape != canal_data.shape:
+                raise ValueError(
+                    f"Shape inválido: esperado {canal_data.shape}, "
+                    f"obtenido {resultado.shape}"
+                )
 
-# WRAPPER ORIENTADO A OBJETOS
+    # =========================================================
+    # HELPER INTERNO — idéntico al filtrador
+    # =========================================================
 
-class Normalizador:
-    """
-    Wrapper stateful para compatibilidad con código existente.
-    Internamente usa funciones puras.
-    
-    Para código nuevo, preferir usar directamente crear_normalizador() 
-    que retorna funciones composables.
-    """
-    
-    def __init__(
-        self, 
-        tipo: TipoNormalizacion = Norm_Global(),
-        metodo: MetodoNormalizacion = MaxNorm()
-    ):
-        self.tipo = tipo
-        self.metodo = metodo
-        self._funcion_pura = crear_normalizador(tipo, metodo)
-        self._cache: Optional[np.ndarray] = None
-
-    def __call__(
+    def _crear(
         self,
-        img_5d: np.ndarray,
+        metodo: MetodoNorm,
+        tipo: TipoAplicacion,
         canal: int = 0,
-        z_ref: int = 0,  # Mantenido por compatibilidad, no usado
-        t_ref: int = 0,  # Mantenido por compatibilidad, no usado
-    ) -> Resultado[np.ndarray, ErrorBioImagen]:
-        """
-        Versión compatible que trabaja con arrays numpy puros.
-        Retorna Resultado explícito (no np.ndarray directo).
-        
-        Para integración en pipelines funcionales, usar .aplicar() en su lugar.
-        """
-        # Crear BioImagenData temporal mínimo
-        T, Z, C, Y, X = img_5d.shape
-        data_temp = BioImagenData(
-            datos=img_5d,
-            dims=Dimensiones(T, Z, C, Y, X),  # Necesitas importar Dimensiones
-            canales=tuple(f"Canal_{i}" for i in range(C)),
-            ruta_origen=Path("temporal"),
-            es_bioformato=False
+    ):
+        self._ultimo_metodo = metodo
+        return self.crear_operador(metodo=metodo, tipo_aplicacion=tipo, canal=canal)
+
+    def _crear_multicanal(self, metodo: MetodoNorm, tipo: TipoAplicacion):
+        self._ultimo_metodo = metodo
+        return self.crear_operador_multicanal(metodo=metodo, tipo_aplicacion=tipo)
+
+    # =========================================================
+    # FACTORIES YAML / CLI → devuelven Operacion
+    # =========================================================
+
+    def crear_operacion_max_norm(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="max_norm",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
         )
-        
-        resultado = self._funcion_pura(data_temp, canal)
-        
-        # Extraer array del resultado
-        return resultado.map(lambda d: d.datos[:, :, canal, :, :])
+
+    def crear_operacion_minmax_norm(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="minmax_norm",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
+        )
+
+    def crear_operacion_percentil_norm(
+        self,
+        percentil_bajo: float = 1.0,
+        percentil_alto: float = 99.0,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="percentil_norm",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={"percentil_bajo": percentil_bajo, "percentil_alto": percentil_alto},
+        )
+
+    def crear_operacion_zscore_norm(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="zscore_norm",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
+        )
+
+    def crear_operacion_to_uint8(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="to_uint8",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
+        )
+
+    def crear_operacion_to_uint16(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="to_uint16",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
+        )
+
+    def crear_operacion_to_float32(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="to_float32",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
+        )
+
+    def crear_operacion_to_float64(
+        self,
+        tipo: TipoAplicacion = Global(),
+        canal: Optional[int] = 0,
+        nombre: Optional[str] = None,
+    ) -> Operacion:
+        return self.crear_operacion(
+            nombre_metodo="to_float64",
+            categoria=CategoriaOperacion.PREPROCESAMIENTO,
+            tipo_aplicacion=tipo,
+            canal=canal,
+            nombre=nombre,
+            params={},
+        )
+
+    # =========================================================
+    # USO IMPERATIVO
+    # =========================================================
 
     def aplicar(
         self,
         data: BioImagenData,
-        canal: int = 0
+        metodo: MetodoNorm,
+        tipo: TipoAplicacion,
+        canal: int = 0,
     ) -> Resultado[BioImagenData, ErrorBioImagen]:
-        """
-        Versión nativa funcional. Usar esta para pipelines.
-        """
-        return self._funcion_pura(data, canal)
+        return self._crear(metodo, tipo, canal)(data)
 
-    def aplicar_todos(
+    def aplicar_multicanal(
         self,
-        data: BioImagenData
+        data: BioImagenData,
+        metodo: MetodoNorm,
+        tipo: TipoAplicacion,
     ) -> Resultado[BioImagenData, ErrorBioImagen]:
-        """
-        Aplica la normalización a todos los canales.
-        """
-        return normalizar_todos_canales(self.tipo, self.metodo)(data)
+        return self._crear_multicanal(metodo, tipo)(data)
 
-    def reset(self):
-        """Limpia caché interna."""
-        self._cache = None
-
-    def __repr__(self) -> str:
-        return f"<Normalizador tipo={self.tipo.__class__.__name__} metodo={self.metodo.nombre}>"
-
-
-# ==================== FACTORY PARA PIPELINES ====================
-
-def operacion_normalizacion(
-    tipo: TipoNormalizacion = Norm_Global(),
-    metodo: MetodoNormalizacion = MaxNorm(),
-    canal: int = 0,
-    nombre: str = ""
-) -> Operacion:
-
-    normalizador = crear_normalizador(tipo, metodo)
-
-    return Operacion(
-        nombre=nombre or f"normalizacion_{metodo.nombre}_{tipo.__class__.__name__}",
-        categoria=CategoriaOperacion.PREPROCESAMIENTO,
-        instancia_callable=normalizador,
-        canal_objetivo=canal,
-        parametros_originales={
-            "tipo": tipo.__class__.__name__,
-            "metodo": metodo.nombre,
-            "canal": canal
-        }
-    )
+    def __repr__(self):
+        nombre = getattr(self._ultimo_metodo, "nombre", "None")
+        return f"<Controlador_Normalizador ultimo={nombre}>"

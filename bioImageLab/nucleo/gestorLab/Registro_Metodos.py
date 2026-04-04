@@ -10,7 +10,6 @@ TSalida = TypeVar("TSalida")
 from .Resultado_Either import Resultado, Ok, Err
 from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 
-# 👇 IMPORTANTE: usar TU registry
 from .Registro_Metodos import registro_metodos
 
 
