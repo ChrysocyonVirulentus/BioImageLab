@@ -87,17 +87,33 @@ class Constructor_Flujo_Trabajo:
 
         return pipeline
 
-    def _validar_pipeline(self):
+    def validar_pipeline(self):
 
-        if not self._operaciones:
-            return
+        errores = []
 
-        tipo_actual = self._operaciones[0].tipo_entrada
+        tipo_actual = None
 
         for op in self._operaciones:
-            op.validar_compatibilidad(tipo_actual)
+            if tipo_actual and not issubclass(tipo_actual, op.tipo_entrada):
+                errores.append(...)
             tipo_actual = op.tipo_salida_real
-            
+
+        return errores
+
+    def _ejecutar_con_validacion(self, op, data):
+
+        tipo_actual = type(data)
+
+        if not issubclass(tipo_actual, op.tipo_entrada):
+            return Err(ErrorBioImagen(
+                etapa="pipeline",
+                mensaje=(
+                    f"Tipo inválido: {tipo_actual.__name__} → "
+                    f"{op.tipo_entrada.__name__} en '{op.nombre}'"
+                )
+            ))
+
+        return op.ejecutar(data)
     # =========================================================
     # LOGGING
     # =========================================================

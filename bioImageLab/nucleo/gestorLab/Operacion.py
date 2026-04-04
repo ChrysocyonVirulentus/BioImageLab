@@ -81,21 +81,37 @@ class Operacion(Generic[TEntrada, TSalida]):
     # =========================================================
 
     def then(self, siguiente: "Operacion[TSalida, Any]") -> "Operacion[TEntrada, Any]":
-        # VALiDACION: 
-        if not issubclass(self.tipo_salida_real, siguiente.tipo_entrada):
-            raise TypeError(
-                f"Incompatibilidad: {self.tipo_salida_real.__name__} → "
-                f"{siguiente.tipo_entrada.__name__} en '{self.nombre} >> {siguiente.nombre}'"
-            )
-        
+
         def _compuesto(data: TEntrada):
-            return self.ejecutar(data).bind(siguiente.ejecutar)
+
+            resultado = self.ejecutar(data)
+
+            # Si ya viene error → propagación natural
+            if resultado.es_err():
+                return resultado
+
+            salida = resultado.unwrap()
+
+            # VALIDACIÓN SEGURA (NO rompe)
+            # issubclass : A es igual a B, o A hereda de B
+            if not issubclass(self.tipo_salida_real, siguiente.tipo_entrada):
+                return Err(ErrorBioImagen(
+                    etapa="pipeline",
+                    mensaje=(
+                        f"Incompatibilidad de tipos: "
+                        f"{self.tipo_salida_real.__name__} → "
+                        f"{siguiente.tipo_entrada.__name__} "
+                        f"en '{self.nombre} >> {siguiente.nombre}'"
+                    )
+                ))
+
+            return siguiente.ejecutar(salida)
 
         return Operacion(
             nombre=f"{self.nombre} >> {siguiente.nombre}",
             categoria=siguiente.categoria,
             instancia_callable=_compuesto,
-            tipo_entrada=self.tipo_entrada,             # 🔥 importante
+            tipo_entrada=self.tipo_entrada,
             tipo_salida_real=siguiente.tipo_salida_real,
             tipo_salida=siguiente.tipo_salida
         )
