@@ -31,7 +31,6 @@ import cv2
 from typing import Optional, Literal
 import warnings
 
-@registrar_en("filtrado")
 class FiltroNoLocal:
     """
         Clase base para filtros no locales.
@@ -62,7 +61,7 @@ class FiltroNoLocal:
         if img.ndim != 2:
             raise ValueError(f"La imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-@registrar_en("filtrado")
+@registrar_en("filtracion")
 class NonLocalMeans(FiltroNoLocal):
     """
         Filtro Non-Local Means (NLM) para denoising preservando texturas.
@@ -205,7 +204,7 @@ class NonLocalMeans(FiltroNoLocal):
         
         return img_filtrada
 
-@registrar_en("filtrado")
+@registrar_en("filtracion")
 class BlockMatching3D(FiltroNoLocal):
     """
         Block-Matching 3D (BM3D) para denoising estado del arte.
@@ -369,7 +368,7 @@ class BlockMatching3D(FiltroNoLocal):
         
         return float(sigma_estimado)
 
-@registrar_en("filtrado")
+@registrar_en("filtracion")
 class NonLocalMeansMultiescala(FiltroNoLocal):
     """
         Variante multiescala de Non-Local Means para mejor manejo de ruido.

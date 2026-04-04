@@ -54,7 +54,7 @@ class FiltroMultiescala:
         if img.ndim != 2:
             raise ValueError(f"La imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-
+@registrar_en("filtracion")
 class DiferenciaGaussiana(FiltroMultiescala):
     """
         Filtro de Diferencia de Gaussianas (DoG) para detección de blobs.
@@ -158,7 +158,7 @@ class DiferenciaGaussiana(FiltroMultiescala):
         
         return dog.astype(img.dtype)
 
-
+@registrar_en("filtracion")
 class DiferenciaLaplaciana(FiltroMultiescala):
     """
         Filtro de Diferencia de Laplacianas (DoL) para detección multiescala.
@@ -239,7 +239,7 @@ class DiferenciaLaplaciana(FiltroMultiescala):
         
         return dol.astype(img.dtype)
 
-
+@registrar_en("filtracion")
 class PiramideLaplaciana(FiltroMultiescala):
     """
         Pirámide Laplaciana para descomposición multiescala de la imagen.
@@ -363,7 +363,7 @@ class PiramideLaplaciana(FiltroMultiescala):
         
         return img_reconstruida
 
-@registrar_en("filtrado")
+@registrar_en("filtracion")
 class WaveletTransform(FiltroMultiescala):
     """
         Transformada Wavelet para análisis tiempo-frecuencia multiescala.

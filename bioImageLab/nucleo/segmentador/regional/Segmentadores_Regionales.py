@@ -18,7 +18,7 @@ IMPORTANTE - Separación de responsabilidades:
 - Trabajan con imágenes de intensidad, color o características según el método
 - La inicialización (semillas, grafo) puede requerir pre-segmentación externa
 - Estos métodos agrupan regiones, NO detectan objetos específicos (eso es rol del detector)
-- Para separar objetos tocantes, usar Segmentadores_Instanciales.py
+- Para separar objetos tocantes, usar segmentacionres_Instanciales.py
 
 Tipos de segmentación regional:
 - Crecimiento de regiones: Expansión desde semillas según criterio de homogeneidad
@@ -33,7 +33,7 @@ Métodos disponibles:
 - CorteGrafico: Minimización de energía mediante corte mínimo en grafo
 - SuperpixelSLIC: Superpíxeles compactos y homogéneos (Simple Linear Iterative Clustering)
 - SuperpixelFelzenszwalb: Superpíxeles basados en partición de grafos
-- WatershedRegiones: Watershed como segmentador regional (variante sin máscara binaria)
+- WatershedRegiones: Watershed como segmentacionr regional (variante sin máscara binaria)
 - MeanShiftSegmentacion: Segmentación por modo de densidad (clustering espacial-color)
 """
 
@@ -48,11 +48,11 @@ from sklearn.cluster import MeanShift as SklearnMeanShift
 import warnings
 
 
-class SegmentadorRegional:
+class segmentacionrRegional:
     """
-        Clase base para segmentadores regionales.
+        Clase base para segmentacionres regionales.
         
-        Los segmentadores regionales agrupan píxeles en regiones coherentes
+        Los segmentacionres regionales agrupan píxeles en regiones coherentes
         basándose en similitud local o conectividad estructurada.
         
         Conceptos clave:
@@ -62,7 +62,7 @@ class SegmentadorRegional:
             - Semilla: Punto inicial para crecimiento de región
             - Grafo: Representación de adyacencia y pesos entre píxeles/regiones
     """
-    nombre = "segmentador_regional_base"
+    nombre = "segmentacionr_regional_base"
     
     def __call__(self, 
                 img: np.ndarray,
@@ -97,8 +97,8 @@ class SegmentadorRegional:
             return color.rgb2lab(img)
         return img
 
-@registrar_en("segmentado")
-class RegionGrowing(SegmentadorRegional):
+@registrar_en("segmentacion")
+class RegionGrowing(segmentacionrRegional):
     """
         Crecimiento de regiones desde semillas según criterio de homogeneidad.
         
@@ -317,8 +317,8 @@ class RegionGrowing(SegmentadorRegional):
         resultado, _ = ndimage.label(resultado > 0)
         return resultado.astype(np.int32)
 
-@registrar_en("segmentado")
-class RandomWalk(SegmentadorRegional):
+@registrar_en("segmentacion")
+class RandomWalk(segmentacionrRegional):
     """
         Segmentación por caminos aleatorios (Random Walker).
         
@@ -467,8 +467,8 @@ class RandomWalk(SegmentadorRegional):
             )
             return etiquetas.astype(np.int32)
 
-@registrar_en("segmentado")
-class CorteGrafico(SegmentadorRegional):
+@registrar_en("segmentacion")
+class CorteGrafico(segmentacionrRegional):
     """
         Segmentación por corte mínimo en grafo (Graph Cut).
         
@@ -644,8 +644,8 @@ class CorteGrafico(SegmentadorRegional):
         etiquetas = etiquetas_sp[superpixels]
         return etiquetas.astype(np.int32)
 
-@registrar_en("segmentado")
-class SuperpixelSLIC(SegmentadorRegional):
+@registrar_en("segmentacion")
+class SuperpixelSLIC(segmentacionrRegional):
     """
         Segmentación en superpíxeles compactos y homogéneos (SLIC).
         
@@ -778,8 +778,8 @@ class SuperpixelSLIC(SegmentadorRegional):
         from skimage.segmentation import mark_boundaries
         return (mark_boundaries(img, etiquetas) * 255).astype(np.uint8)
 
-@registrar_en("segmentado")
-class SuperpixelFelzenszwalb(SegmentadorRegional):
+@registrar_en("segmentacion")
+class SuperpixelFelzenszwalb(segmentacionrRegional):
     """
         Superpíxeles por partición de grafos (Felzenszwalb-Huttenlocher).
         
@@ -889,10 +889,10 @@ class SuperpixelFelzenszwalb(SegmentadorRegional):
         
         return etiquetas.astype(np.int32)
 
-@registrar_en("segmentado")
-class WatershedRegiones(SegmentadorRegional):
+@registrar_en("segmentacion")
+class WatershedRegiones(segmentacionrRegional):
     """
-        Watershed como segmentador regional sin máscara binaria previa.
+        Watershed como segmentacionr regional sin máscara binaria previa.
         
         Versión del algoritmo watershed que opera directamente sobre la
         imagen de intensidad sin requerir una máscara binaria de objetos.
@@ -910,7 +910,7 @@ class WatershedRegiones(SegmentadorRegional):
         
         Ventajas:
             - No requiere binarización previa (menos parámetros)
-            - Segmentación completa de la imagen (no hay "fondo" no segmentado)
+            - Segmentación completa de la imagen (no hay "fondo" no segmentacion)
             - Regiones siguen topografía natural de la imagen
             - Útil para análisis de textura y patrones
         
@@ -987,8 +987,8 @@ class WatershedRegiones(SegmentadorRegional):
         
         return etiquetas.astype(np.int32)
 
-@registrar_en("segmentado")
-class MeanShiftSegmentacion(SegmentadorRegional):
+@registrar_en("segmentacion")
+class MeanShiftSegmentacion(segmentacionrRegional):
     """
         Segmentación por modo de densidad (Mean Shift clustering).
         
@@ -1124,8 +1124,8 @@ class MeanShiftSegmentacion(SegmentadorRegional):
         
         return etiquetas.astype(np.int32)
 
-@registrar_en("segmentado")
-class SegmentacionEspectral(SegmentadorRegional):
+@registrar_en("segmentacion")
+class SegmentacionEspectral(segmentacionrRegional):
     """
         Segmentación espectral basada en eigenvalores de matriz de similitud.
         

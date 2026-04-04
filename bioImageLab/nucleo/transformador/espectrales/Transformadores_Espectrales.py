@@ -23,6 +23,7 @@ Métodos disponibles:
 import numpy as np
 from typing import Optional, Tuple, Literal, Union, List
 from scipy.fft import fft2, ifft2, fftshift, ifftshift
+from ...gestorLab.Registro_Metodos import registrar_en
 import warnings
 
 
@@ -37,7 +38,7 @@ class TransformadorEspectral:
         if img.ndim != 2:
             raise ValueError(f"Imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-
+@registrar_en("transformacion")
 class Fourier(TransformadorEspectral):
     """
         Transformada de Fourier 2D para análisis espectral global.
@@ -106,7 +107,7 @@ class Fourier(TransformadorEspectral):
         
         return espectro * mascara
 
-
+@registrar_en("transformacion")
 class Wavelet(TransformadorEspectral):
     """
         Transformada Wavelet 2D para análisis multiescala tiempo-frecuencia.
@@ -210,7 +211,7 @@ class Wavelet(TransformadorEspectral):
                 energias.append(np.var(c))
         return energias
 
-
+@registrar_en("transformacion")
 class Gabor(TransformadorEspectral):
     """
         Transformada de Gabor para análisis de textura direccional.

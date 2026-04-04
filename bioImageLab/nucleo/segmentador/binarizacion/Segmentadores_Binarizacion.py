@@ -72,7 +72,7 @@ class MetodoBinarizacion:
         if img.ndim != 2:
             raise ValueError(f"La imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Otsu(MetodoBinarizacion):
     """
         Método de Otsu para umbralización automática óptima.
@@ -162,7 +162,7 @@ class Otsu(MetodoBinarizacion):
                 "Use normalizador.py para convertir primero."
             )
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Global(MetodoBinarizacion):
     """
         Umbralización global con valor fijo manual.
@@ -229,7 +229,7 @@ class Global(MetodoBinarizacion):
         
         return img_binaria
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Adaptativo(MetodoBinarizacion):
     """
         Umbralización adaptativa con umbral local variable.
@@ -344,7 +344,7 @@ class Adaptativo(MetodoBinarizacion):
         
         return img_binaria
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Percentil(MetodoBinarizacion):
     """
         Umbralización basada en percentil del histograma.
@@ -413,7 +413,7 @@ class Percentil(MetodoBinarizacion):
         
         return img_binaria
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Triangle(MetodoBinarizacion):
     """
         Método Triangle para histogramas unimodales con cola larga.
@@ -483,7 +483,7 @@ class Triangle(MetodoBinarizacion):
                 f"Triangle requiere uint8 o uint16, recibió {img.dtype}."
             )
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Mean(MetodoBinarizacion):
     """
         Umbralización usando la media de intensidades.
@@ -531,7 +531,7 @@ class Mean(MetodoBinarizacion):
         
         return img_binaria
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Isodata(MetodoBinarizacion):
     """
         Método Isodata (Ridler-Calvard) iterativo.
@@ -621,7 +621,7 @@ class Isodata(MetodoBinarizacion):
         
         return img_binaria
 
-@registrar_en("segmentado")
+@registrar_en("segmentacion")
 class Minimum(MetodoBinarizacion):
     """
         Método Minimum para histogramas bimodales.

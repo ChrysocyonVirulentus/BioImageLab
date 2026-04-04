@@ -56,8 +56,8 @@ class Controlador_Filtrador((Controlador_Base[BioImagenData, BioImagenData])):
     """
 
     def __init__(self):
-        # dominio="filtrado" debe coincidir con @registrar_en("filtrado")
-        super().__init__(etapa="filtracion", dominio="filtrado")
+        # dominio="filtracion" debe coincidir con @registrar_en("filtracion")
+        super().__init__(etapa="procesamiento", dominio="filtracion")
         self._ultimo_metodo: Optional[MetodoFiltro] = None
 
     # =========================================================
