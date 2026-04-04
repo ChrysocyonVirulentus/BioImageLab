@@ -87,6 +87,17 @@ class Constructor_Flujo_Trabajo:
 
         return pipeline
 
+    def _validar_pipeline(self):
+
+        if not self._operaciones:
+            return
+
+        tipo_actual = self._operaciones[0].tipo_entrada
+
+        for op in self._operaciones:
+            op.validar_compatibilidad(tipo_actual)
+            tipo_actual = op.tipo_salida_real
+            
     # =========================================================
     # LOGGING
     # =========================================================

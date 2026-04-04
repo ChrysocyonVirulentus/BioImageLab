@@ -94,7 +94,7 @@ class CuantificadorEstadistico:
         else:
             raise ValueError(f"Tipo de datos no soportado: {type(datos)}")
 
-
+@registrar_en("cuantificacion")
 class EstadisticosDescriptivos(CuantificadorEstadistico):
     """
         Estadísticos descriptivos clásicos de población de objetos.
@@ -330,7 +330,7 @@ class EstadisticosDescriptivos(CuantificadorEstadistico):
         
         return df_comparacion
 
-
+@registrar_en("cuantificacion")
 class Distribuciones(CuantificadorEstadistico):
     """
         Análisis de distribuciones y ajuste de modelos probabilísticos.
@@ -542,7 +542,7 @@ class Distribuciones(CuantificadorEstadistico):
             'es_multimodal': mejor_n > 1
         }
 
-
+@registrar_en("cuantificacion")
 class Correlaciones(CuantificadorEstadistico):
     """
         Análisis de correlaciones entre métricas e imágenes.

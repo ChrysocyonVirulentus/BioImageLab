@@ -62,8 +62,9 @@ except ImportError:
 
 # =============================================================================
 # 1. EVALUACIÓN DE RENDIMIENTO DE CLASIFICACIÓN
-# =============================================================================
-
+# ======
+# =======================================================================
+@registrar_en("modelado")
 class EvaluadorClasificacion:
     """
     Métricas de evaluación para clasificación supervisada.
@@ -299,7 +300,7 @@ class EvaluadorClasificacion:
 # =============================================================================
 # 2. MANEJO DE DESBALANCEO DE CLASES
 # =============================================================================
-
+@registrar_en("modelado")
 class ManejadorDesbalanceo:
     """
     Estrategias para manejar clases desbalanceadas en microscopía.
@@ -560,7 +561,7 @@ class ClasificadorBase:
         evaluador = EvaluadorClasificacion()
         return evaluador.evaluar_completo(y_true_encoded, y_pred, y_proba)
 
-
+@registrar_en("modelado")
 class SVMClasificador(ClasificadorBase):
     """
     Support Vector Machine para clasificación de fenotipos celulares.
@@ -688,7 +689,7 @@ class SVMClasificador(ClasificadorBase):
             raise RuntimeError("Llamar fit() primero.")
         return len(self._modelo.support_)
 
-
+@registrar_en("modelado")
 class RandomForestClasificador(ClasificadorBase):
     """
     Random Forest para clasificación de fenotipos celulares.
@@ -940,7 +941,7 @@ class RandomForestClasificador(ClasificadorBase):
         
         return np.array(predicciones), np.array(limite_inf), np.array(limite_sup)
 
-
+@registrar_en("modelado")
 class LogisticRegressionClasificador(ClasificadorBase):
     """
     Regresión Logística para clasificación de fenotipos celulares.
@@ -1174,7 +1175,7 @@ class LogisticRegressionClasificador(ClasificadorBase):
 # =============================================================================
 # 4. VALIDACIÓN CRUZADA Y SELECCIÓN DE HIPERPARÁMETROS
 # =============================================================================
-
+@registrar_en("modelado")
 class ValidadorCruzado:
     """
     Validación cruzada estratificada y selección de hiperparámetros.

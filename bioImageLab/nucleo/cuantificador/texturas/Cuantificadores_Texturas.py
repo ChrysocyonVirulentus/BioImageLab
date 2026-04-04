@@ -179,7 +179,7 @@ class CuantificadorTextura:
 
 
 # GLCM — Matriz de Co-ocurrencia de Niveles de Gris
-
+@registrar_en("cuantificacion")
 class GLCM(CuantificadorTextura):
     """
         Matriz de Co-ocurrencia de Niveles de Gris (Gray-Level Co-occurrence Matrix).
@@ -400,7 +400,7 @@ class GLCM(CuantificadorTextura):
         return glcm
 
 # Características de Haralick
-
+@registrar_en("cuantificacion")
 class CaracteristicasHaralick(CuantificadorTextura):
     """
         Las 13 características de textura de Haralick derivadas de la GLCM.
@@ -695,7 +695,7 @@ class CaracteristicasHaralick(CuantificadorTextura):
 
 
 # LBP — Local Binary Pattern
-
+@registrar_en("cuantificacion")
 class LBP(CuantificadorTextura):
     """
         Patron Binario Local (Local Binary Pattern) dentro de la máscara.
@@ -861,7 +861,7 @@ class LBP(CuantificadorTextura):
 
 
 # Filtros de Gabor
-
+@registrar_en("cuantificacion")
 class FiltrosGabor(CuantificadorTextura):
     """
         Banco de filtros de Gabor 2D para análisis de textura orientada en frecuencia.
@@ -1054,7 +1054,7 @@ class FiltrosGabor(CuantificadorTextura):
 
 
 # GLRLM — Matriz de Longitud de Corrida
-
+@registrar_en("cuantificacion")
 class GLRLM(CuantificadorTextura):
     """
         Matriz de Longitud de Corrida de Niveles de Gris (Gray-Level Run-Length Matrix).
@@ -1303,7 +1303,7 @@ class GLRLM(CuantificadorTextura):
 
 
 # Energía de Laws
-
+@registrar_en("cuantificacion")
 class EnergiaLaws(CuantificadorTextura):
     """
         Energía de textura de Laws (Laws' Texture Energy Measures).

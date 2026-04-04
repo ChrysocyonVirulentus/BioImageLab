@@ -27,7 +27,6 @@ import numpy as np
 from typing import List, Tuple
 from ...gestorLab.Registro_Metodos import registrar_en
 
-@registrar_en("filtracion")
 class FiltroEspectral:
     """
         Clase base para filtros espectrales basados en FFT.

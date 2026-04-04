@@ -60,7 +60,7 @@ class CuantificadorMorfometrico:
         """Obtiene propiedades de regiones etiquetadas."""
         return measure.regionprops(img.astype(int))
 
-
+@registrar_en("cuantificacion")
 class Area(CuantificadorMorfometrico):
     """
             Área de regiones segmentadas en píxeles.
@@ -110,7 +110,7 @@ class Area(CuantificadorMorfometrico):
         
         return int(np.sum(img_segmentada > 0))
 
-
+@registrar_en("cuantificacion")
 class Perimetro(CuantificadorMorfometrico):
     """
             Perímetro de regiones segmentadas.
@@ -170,7 +170,7 @@ class Perimetro(CuantificadorMorfometrico):
         
         return float(perimetro)
 
-
+@registrar_en("cuantificacion")
 class Centroide(CuantificadorMorfometrico):
     """
             Centro geométrico (centro de masa) de regiones.
@@ -223,7 +223,7 @@ class Centroide(CuantificadorMorfometrico):
         cx = np.mean(coords[1])
         return (float(cy), float(cx))
 
-
+@registrar_en("cuantificacion")
 class CajaFrontera(CuantificadorMorfometrico):
     """
             Bounding box (caja envolvente) de regiones.
@@ -281,7 +281,7 @@ class CajaFrontera(CuantificadorMorfometrico):
         min_r, min_c, max_r, max_c = bbox
         return (max_r - min_r, max_c - min_c)
 
-
+@registrar_en("cuantificacion")
 class DiametroEquivalente(CuantificadorMorfometrico):
     """
             Diámetro de círculo con igual área que la región.
@@ -331,7 +331,7 @@ class DiametroEquivalente(CuantificadorMorfometrico):
         area = np.sum(img_segmentada > 0)
         return 2 * np.sqrt(area / np.pi)
 
-
+@registrar_en("cuantificacion")
 class Excentricidad(CuantificadorMorfometrico):
     """
             Excentricidad de la elipse equivalente.
@@ -404,7 +404,7 @@ class Excentricidad(CuantificadorMorfometrico):
         
         return np.sqrt(1 - (eigenvals[1] / eigenvals[0]))
 
-
+@registrar_en("cuantificacion")
 class Circularidad(CuantificadorMorfometrico):
     """
             Circularidad (o forma) de regiones.
@@ -475,7 +475,7 @@ class Circularidad(CuantificadorMorfometrico):
         
         return 4 * np.pi * area / (perimetro ** 2)
 
-
+@registrar_en("cuantificacion")
 class Compactacion(CuantificadorMorfometrico):
     """
             Compacidad: ratio entre perímetro y área.
@@ -545,7 +545,7 @@ class Compactacion(CuantificadorMorfometrico):
             return perimetro / (2 * np.sqrt(np.pi * area))
         return (perimetro ** 2) / area
 
-
+@registrar_en("cuantificacion")
 class Orientacion(CuantificadorMorfometrico):
     """
             Orientación principal de regiones (ángulo del eje mayor).
@@ -659,7 +659,7 @@ class Orientacion(CuantificadorMorfometrico):
         
         return (float(eje_mayor), float(eje_menor))
 
-
+@registrar_en("cuantificacion")
 class Convexidad(CuantificadorMorfometrico):
     """
             Convexidad: ratio entre área y área del convex hull.
@@ -727,7 +727,7 @@ class Convexidad(CuantificadorMorfometrico):
         area_objeto = np.sum(img_bin)
         return area_objeto / area_convex if area_convex > 0 else 0.0
 
-
+@registrar_en("cuantificacion")
 class Concavidad(CuantificadorMorfometrico):
     """
             Concavidad: medida de profundidad de indentaciones.
@@ -814,7 +814,7 @@ class Concavidad(CuantificadorMorfometrico):
         except:
             return 0.0
 
-
+@registrar_en("cuantificacion")
 class Forma(CuantificadorMorfometrico):
     """
         Descriptor de forma compuesto (HU moments).

@@ -63,7 +63,7 @@ class CuantificadorTopologico:
         """Convierte imagen a binaria segura."""
         return (img > 0).astype(np.uint8)
 
-
+@registrar_en("cuantificacion")
 class MetricasEsqueleticas(CuantificadorTopologico):
     """
             Métricas del esqueleto/medial axis de objetos.
@@ -227,7 +227,7 @@ class MetricasEsqueleticas(CuantificadorTopologico):
         
         return float(np.mean(tortuosidades)) if tortuosidades else 1.0
 
-
+@registrar_en("cuantificacion")
 class Branching(CuantificadorTopologico):
     """
         Análisis de ramificación y árbol de conectividad.
@@ -405,7 +405,7 @@ class Branching(CuantificadorTopologico):
             'numero_ramas': int(np.sum(puntos_rami) + np.sum(puntos_term) / 2)
         }
 
-
+@registrar_en("cuantificacion")
 class Contornos(CuantificadorTopologico):
     """
         Detección y análisis de contornos de objetos.
@@ -616,7 +616,7 @@ class Contornos(CuantificadorTopologico):
             d2 = distancias.min(axis=0).max()
             return float(max(d1, d2))
 
-
+@registrar_en("cuantificacion")
 class Conectividad(CuantificadorTopologico):
     """
         Métricas de conectividad de componentes y agujeros.
@@ -700,7 +700,7 @@ class Conectividad(CuantificadorTopologico):
             'conectividad_usada': self.conectividad
         }
 
-
+@registrar_en("cuantificacion")
 class DistanciaGeodesica(CuantificadorTopologico):
     """
         Distancias geodésicas dentro de objetos segmentados.

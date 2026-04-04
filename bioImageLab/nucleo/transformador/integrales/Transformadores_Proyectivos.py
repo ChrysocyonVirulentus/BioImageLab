@@ -44,7 +44,7 @@ class TransformadorProyectivo:
         if img.ndim != 2:
             raise ValueError(f"Imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-
+@registrar_en("transformacion")
 class Radon(TransformadorProyectivo):
     """
         Transformada de Radon (proyecciones a lo largo de líneas).
@@ -105,7 +105,7 @@ class Radon(TransformadorProyectivo):
         
         return lineas
 
-
+@registrar_en("transformacion")
 class Hough(TransformadorProyectivo):
     """
         Transformada de Hough para detección de formas paramétricas.
@@ -196,7 +196,7 @@ class Hough(TransformadorProyectivo):
         
         return circulos
 
-
+@registrar_en("transformacion")
 class DistanciaGeodesica(TransformadorProyectivo):
     """
         Transformada de distancia geodésica (a lo largo de superficie).
@@ -291,7 +291,7 @@ class DistanciaGeodesica(TransformadorProyectivo):
         
         return distancia
 
-
+@registrar_en("transformacion")
 class TransformadaAbel(TransformadorProyectivo):
     """
         Transformada de Abel para simetría cilíndrica (proyecciones axiales).
@@ -340,7 +340,7 @@ class TransformadaAbel(TransformadorProyectivo):
         else:
             return abel.Transform(img, direction='inverse', center=(cy, cx)).transform
 
-
+@registrar_en("transformacion")
 class TransformadaHilbert(TransformadorProyectivo):
     """
         Transformada de Hilbert para análisis de fase y señales analíticas.
@@ -396,7 +396,7 @@ class TransformadaHilbert(TransformadorProyectivo):
         """Calcula frecuencia instantánea como derivada de fase."""
         return np.diff(fase, axis=self.eje, prepend=fase[:, :1] if self.eje == 1 else fase[:1, :])
 
-
+@registrar_en("transformacion")
 class IntegralDeLinea(TransformadorProyectivo):
     """
         Integración de intensidad a lo largo de líneas curvas o rectas.

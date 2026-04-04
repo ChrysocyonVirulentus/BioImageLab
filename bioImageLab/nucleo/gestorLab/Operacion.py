@@ -45,6 +45,10 @@ class Operacion(Generic[TEntrada, TSalida]):
     # ── Callable con canal ya capturado en el cierre (si corresponde) ──────
     instancia_callable: Callable[[TEntrada], Resultado[TSalida, ErrorBioImagen]]
 
+    # CONTRATO DE TIPOS (runtime)
+    tipo_entrada: type = object
+    tipo_salida_real: type = object
+
     tipo_salida:           TipoSalida            = TipoSalida.IMAGEN
     parametros_originales: Dict[str, Any]        = field(default_factory=dict)
     descripcion:           str                   = ""
@@ -76,9 +80,14 @@ class Operacion(Generic[TEntrada, TSalida]):
     # DEBUG
     # =========================================================
 
-    #NOTA HAY QUE EN ALGUN MOMENTO HACER: assert tipo_salida_op1 == tipo_entrada_op2
-    # Permitira hacer : pipeline = op1.then(op2).then(op3)
     def then(self, siguiente: "Operacion[TSalida, Any]") -> "Operacion[TEntrada, Any]":
+        # VALiDACION: 
+        if not issubclass(self.tipo_salida_real, siguiente.tipo_entrada):
+            raise TypeError(
+                f"Incompatibilidad: {self.tipo_salida_real.__name__} → "
+                f"{siguiente.tipo_entrada.__name__} en '{self.nombre} >> {siguiente.nombre}'"
+            )
+        
         def _compuesto(data: TEntrada):
             return self.ejecutar(data).bind(siguiente.ejecutar)
 
@@ -86,6 +95,8 @@ class Operacion(Generic[TEntrada, TSalida]):
             nombre=f"{self.nombre} >> {siguiente.nombre}",
             categoria=siguiente.categoria,
             instancia_callable=_compuesto,
+            tipo_entrada=self.tipo_entrada,             # 🔥 importante
+            tipo_salida_real=siguiente.tipo_salida_real,
             tipo_salida=siguiente.tipo_salida
         )
 

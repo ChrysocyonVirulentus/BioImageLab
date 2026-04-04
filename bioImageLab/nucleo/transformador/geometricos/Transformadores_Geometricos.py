@@ -46,7 +46,7 @@ class TransformadorGeometrico:
         if img.ndim != 2:
             raise ValueError(f"Imagen debe ser 2D, tiene {img.ndim} dimensiones")
 
-
+@registrar_en("transformacion")
 class TransformacionDistancia(TransformadorGeometrico):
     """
         Transformada de distancia euclidiana y funciones derivadas.
@@ -107,7 +107,7 @@ class TransformacionDistancia(TransformadorGeometrico):
         maximos[coords[:, 0], coords[:, 1]] = True
         return maximos
 
-
+@registrar_en("transformacion")
 class Esqueletizacion(TransformadorGeometrico):
     """
         Reducción topológica a esqueleto de líneas de 1 píxel.
@@ -185,7 +185,7 @@ class Esqueletizacion(TransformadorGeometrico):
             'n_componentes': ndimage.label(esqueleto)[1]
         }
 
-
+@registrar_en("transformacion")
 class EjeMedial(TransformadorGeometrico):
     """
         Eje Medial (Medial Axis Transform) con radio local.
@@ -253,7 +253,7 @@ class EjeMedial(TransformadorGeometrico):
                 rec[rr, cc] = True
         return rec
 
-
+@registrar_en("transformacion")
 class Deformar(TransformadorGeometrico):
     """
         Warping no rígido (deformación espacial libre).
@@ -346,7 +346,7 @@ class Deformar(TransformadorGeometrico):
         yy, xx = np.meshgrid(y, x)
         return np.column_stack([yy.ravel(), xx.ravel()])
 
-
+@registrar_en("transformacion")
 class Redimensionar(TransformadorGeometrico):
     """
         Cambio de escala espacial con interpolación controlada.
@@ -412,7 +412,7 @@ class Redimensionar(TransformadorGeometrico):
         
         return resultado
 
-
+@registrar_en("transformacion")
 class Rotacion(TransformadorGeometrico):
     """
         Rotación con preservación de información y tamaño controlado.
@@ -493,7 +493,7 @@ class Rotacion(TransformadorGeometrico):
                             borderMode=border_map[self.modo_borde],
                             borderValue=self.valor_constante)
 
-
+@registrar_en("transformacion")
 class Remuestreo(TransformadorGeometrico):
     """
         Cambio de muestreo espacial con control de aliasing y preservación.

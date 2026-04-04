@@ -54,7 +54,7 @@ except ImportError:
 # =============================================================================
 # 1. EVALUACIÓN DE CALIDAD DE CLUSTERING
 # =============================================================================
-
+@registrar_en("modelado")
 class EvaluadorClustering:
     """
     Métricas de evaluación interna y externa para clustering.
@@ -206,7 +206,7 @@ class EvaluadorClustering:
 # =============================================================================
 # 2. MÉTODOS DE SELECCIÓN DE K (K-MEANS)
 # =============================================================================
-
+@registrar_en("modelado")
 class SelectorK:
     """
     Métodos para determinar el número óptimo de clusters en K-Means.
@@ -435,7 +435,7 @@ class ClusterizadorBase:
         
         return df
 
-
+@registrar_en("modelado")
 class KMeansClustering(ClusterizadorBase):
     """
     K-Means clustering con selección automática de k.
@@ -564,7 +564,7 @@ class KMeansClustering(ClusterizadorBase):
         
         return pd.DataFrame(inercias)
 
-
+@registrar_en("modelado")
 class DBSCANClustering(ClusterizadorBase):
     """
     Density-Based Spatial Clustering of Applications with Noise.
@@ -697,7 +697,7 @@ class DBSCANClustering(ClusterizadorBase):
             raise RuntimeError("Llamar fit_predict() primero.")
         return self._modelo.core_sample_indices_
 
-
+@registrar_en("modelado")
 class HDBSCANClustering(ClusterizadorBase):
     """
     Hierarchical DBSCAN: clustering jerárquico basado en densidad.

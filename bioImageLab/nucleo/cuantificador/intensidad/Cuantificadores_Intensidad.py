@@ -134,7 +134,7 @@ class CuantificadorIntensidad:
 
 
 # Cuantificadores de tendencia central
-
+@registrar_en("cuantificacion")
 class MediaIntensidad(CuantificadorIntensidad):
     """
         Media aritmética de intensidades en la región segmentada.
@@ -191,7 +191,7 @@ class MediaIntensidad(CuantificadorIntensidad):
         pixeles = self._extraer_pixeles_objeto(img_segmentada, img_procesada)
         return float(np.mean(pixeles))
 
-
+@registrar_en("cuantificacion")
 class MedianaIntensidad(CuantificadorIntensidad):
     """
         Mediana de intensidades en la región segmentada.
@@ -254,7 +254,7 @@ class MedianaIntensidad(CuantificadorIntensidad):
         return float(np.median(pixeles))
 
 # Cuantificadores de magnitud total
-
+@registrar_en("cuantificacion")
 class IntensidadIntegrada(CuantificadorIntensidad):
     """
         Intensidad integrada (suma total) de la región segmentada.
@@ -334,7 +334,7 @@ class IntensidadIntegrada(CuantificadorIntensidad):
 
 # Cuantificadores de valores extremos
 
-
+@registrar_en("cuantificacion")
 class MaximoIntensidad(CuantificadorIntensidad):
     """
         Valor máximo de intensidad dentro de la región segmentada.
@@ -415,7 +415,7 @@ class MaximoIntensidad(CuantificadorIntensidad):
                     )
         return maximo
 
-
+@registrar_en("cuantificacion")
 class MinimoIntensidad(CuantificadorIntensidad):
     """
         Valor mínimo de intensidad dentro de la región segmentada.
@@ -474,7 +474,7 @@ class MinimoIntensidad(CuantificadorIntensidad):
         return float(np.min(pixeles))
 
 # Cuantificadores de dispersión
-
+@registrar_en("cuantificacion")
 class DesviacionEstandar(CuantificadorIntensidad):
     """
         Desviación estándar de intensidades en la región segmentada.
@@ -544,7 +544,7 @@ class DesviacionEstandar(CuantificadorIntensidad):
         pixeles = self._extraer_pixeles_objeto(img_segmentada, img_procesada)
         return float(np.std(pixeles, ddof=self.ddof))
 
-
+@registrar_en("cuantificacion")
 class CoeficienteVariacion(CuantificadorIntensidad):
     """
         Coeficiente de variación (CV) de intensidades en la región segmentada.
@@ -630,7 +630,7 @@ class CoeficienteVariacion(CuantificadorIntensidad):
         return float(cv * 100 if self.como_porcentaje else cv)
 
 # Cuantificadores de forma de distribución
-
+@registrar_en("cuantificacion")
 class PercentilIntensidad(CuantificadorIntensidad):
     """
         Percentil arbitrario de la distribución de intensidades en la máscara.
@@ -699,7 +699,7 @@ class PercentilIntensidad(CuantificadorIntensidad):
         pixeles = self._extraer_pixeles_objeto(img_segmentada, img_procesada)
         return float(np.percentile(pixeles, self.percentil))
 
-
+@registrar_en("cuantificacion")
 class AsimetriaIntensidad(CuantificadorIntensidad):
     """
         Asimetría (skewness) de la distribución de intensidades en la máscara.
@@ -781,6 +781,7 @@ class AsimetriaIntensidad(CuantificadorIntensidad):
         skewness = np.mean(((pixeles - media) / sigma) ** 3)
         return float(skewness)
 
+@registrar_en("cuantificacion")
 class CurtosisIntensidad(CuantificadorIntensidad):
     """
         Curtosis de la distribución de intensidades en la región segmentada.
@@ -869,7 +870,7 @@ class CurtosisIntensidad(CuantificadorIntensidad):
         return float(curtosis_pearson)
 
 # Cuantificador de calidad de señal
-
+@registrar_en("cuantificacion")
 class RelacionSenialRuido(CuantificadorIntensidad):
     """
         Relación señal/ruido (SNR) entre objeto segmentado y fondo.
@@ -982,7 +983,7 @@ class RelacionSenialRuido(CuantificadorIntensidad):
             return mu_objeto / sigma_fondo
 
 # Cuantificador espacial
-
+@registrar_en("cuantificacion")
 class PerfilLineal(CuantificadorIntensidad):
     """
         Perfil de intensidad a lo largo de una línea dentro de la máscara.
