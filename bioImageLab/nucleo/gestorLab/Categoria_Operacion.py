@@ -44,8 +44,59 @@ class CategoriaOperacion(Enum):
     def orden(self) -> int:
         return list(CategoriaOperacion).index(self)
 
-    def puede_preceder_a(self, otra: "CategoriaOperacion") -> bool:
-        return self.orden() <= otra.orden()
+    def puede_preceder_a(self, otra):
+        reglas = {
+            CategoriaOperacion.PREPROCESAMIENTO: {
+                CategoriaOperacion.PREPROCESAMIENTO,
+                CategoriaOperacion.FILTRACION,
+                CategoriaOperacion.REALZADOR,
+                CategoriaOperacion.TRANSFORMADOR,
+                CategoriaOperacion.SEGMENTADOR,
+            },
+
+            CategoriaOperacion.FILTRACION: {
+                CategoriaOperacion.FILTRACION,
+                CategoriaOperacion.PREPROCESAMIENTO,
+                CategoriaOperacion.REALZADOR,
+                CategoriaOperacion.TRANSFORMADOR,
+                CategoriaOperacion.SEGMENTADOR,
+            },
+
+            CategoriaOperacion.REALZADOR: {
+                CategoriaOperacion.REALZADOR,
+                CategoriaOperacion.FILTRACION,
+                CategoriaOperacion.PREPROCESAMIENTO,
+                CategoriaOperacion.TRANSFORMADOR,
+                CategoriaOperacion.SEGMENTADOR,
+            },
+
+            CategoriaOperacion.TRANSFORMADOR: {
+                CategoriaOperacion.TRANSFORMADOR,
+                CategoriaOperacion.PREPROCESAMIENTO,
+                CategoriaOperacion.FILTRACION,
+                CategoriaOperacion.REALZADOR,
+                CategoriaOperacion.SEGMENTADOR,
+            },
+
+            CategoriaOperacion.SEGMENTADOR: {
+                CategoriaOperacion.SEGMENTADOR,
+                CategoriaOperacion.CUANTIFICADOR,
+                CategoriaOperacion.ANALIZADOR,
+            },
+
+            CategoriaOperacion.CUANTIFICADOR: {
+                CategoriaOperacion.MODELADOR,
+                CategoriaOperacion.ANALIZADOR,
+            },
+
+            CategoriaOperacion.MODELADOR: {
+                CategoriaOperacion.ANALIZADOR,
+            },
+
+            CategoriaOperacion.ANALIZADOR: set(),
+        }
+
+        return otra in reglas.get(self, set())
 
     # =========================================================
     # PROPIEDADES PIPELINE (DAG)
@@ -71,20 +122,23 @@ class CategoriaOperacion(Enum):
             CategoriaOperacion.PREPROCESAMIENTO: set(),
 
             CategoriaOperacion.FILTRACION: {
-                CategoriaOperacion.PREPROCESAMIENTO
+                CategoriaOperacion.PREPROCESAMIENTO,
+                CategoriaOperacion.FILTRACION
             },
 
             CategoriaOperacion.REALZADOR: {
+                CategoriaOperacion.FILTRACION,
                 CategoriaOperacion.PREPROCESAMIENTO
             },
 
             CategoriaOperacion.TRANSFORMADOR: {
+                CategoriaOperacion.FILTRACION,
                 CategoriaOperacion.PREPROCESAMIENTO
             },
 
             CategoriaOperacion.SEGMENTADOR: {
-                CategoriaOperacion.PREPROCESAMIENTO,
                 CategoriaOperacion.FILTRACION,
+                CategoriaOperacion.PREPROCESAMIENTO,
             },
 
             CategoriaOperacion.CUANTIFICADOR: {
@@ -98,7 +152,6 @@ class CategoriaOperacion(Enum):
 
             CategoriaOperacion.ANALIZADOR: set(),
         }
-
         return deps.get(self, set())
 
     def validar_dependencias(

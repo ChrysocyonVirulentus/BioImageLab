@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 from typing import Union, Optional
+from dataclasses import replace   
 
 # Core
 from .Controlador_Base import Controlador_Base

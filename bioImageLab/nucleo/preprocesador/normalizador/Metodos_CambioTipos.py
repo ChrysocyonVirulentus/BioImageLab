@@ -1,5 +1,5 @@
 import numpy as np
-
+from ...gestorLab.Registro_Metodos import registrar_en
 class MetodoCambioTipo:
     """
     Clase base para conversión de tipos de imagen.
@@ -9,7 +9,7 @@ class MetodoCambioTipo:
     def __call__(self, img: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
-
+@registrar_en("normalizacion")
 class ToUint8(MetodoCambioTipo):
     """
     Convierte cualquier imagen a uint8 (0-255).
@@ -39,7 +39,7 @@ class ToUint8(MetodoCambioTipo):
         else:
             raise TypeError(f"Tipo de imagen no soportado: {img.dtype}")
 
-
+@registrar_en("normalizacion")
 class ToUint16(MetodoCambioTipo):
     """
     Convierte cualquier imagen a uint16 (0-65535).
@@ -66,7 +66,7 @@ class ToUint16(MetodoCambioTipo):
         else:
             raise TypeError(f"Tipo de imagen no soportado: {img.dtype}")
 
-
+@registrar_en("normalizacion")
 class ToFloat32(MetodoCambioTipo):
     """
     Convierte cualquier imagen a float32 (0.0-1.0 si era uint8/16).
@@ -87,7 +87,7 @@ class ToFloat32(MetodoCambioTipo):
         else:
             raise TypeError(f"Tipo de imagen no soportado: {img.dtype}")
 
-
+@registrar_en("normalizacion")
 class ToFloat64(MetodoCambioTipo):
     """
     Convierte cualquier imagen a float64 (0.0-1.0 si era uint8/16).

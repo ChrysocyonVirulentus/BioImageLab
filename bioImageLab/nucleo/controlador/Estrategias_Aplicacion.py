@@ -6,6 +6,13 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Callable, Union, Protocol, runtime_checkable
 
+import inspect
+
+# HELPER QUE INSPECCIONA FIRMA REAL
+
+def es_metodo_con_referencia(metodo) -> bool:
+    sig = inspect.signature(metodo.__call__)
+    return len(sig.parameters) == 3  # self, ref, data
 
 # ==================== PROTOCOLS (POLIMORFISMO ESTRUCTURAL) ====================
 
@@ -151,7 +158,8 @@ def aplicar_global(
 
     Debe devolver mismo shape.
     """
-    if isinstance(metodo, MetodoConReferencia):
+    #if isinstance(metodo, MetodoConReferencia):
+    if es_metodo_con_referencia(metodo):
         resultado = metodo(canal_data, canal_data)
     else:
         resultado = metodo(canal_data)
@@ -187,7 +195,8 @@ def aplicar_por_corte_z(
     for z in range(Z):
         bloque = canal_data[:, z, :, :]
 
-        if isinstance(metodo, MetodoConReferencia):
+        #if isinstance(metodo, MetodoConReferencia):
+        if es_metodo_con_referencia(metodo):
             procesado = metodo(bloque, bloque)
         else:
             procesado = metodo(bloque)
@@ -221,7 +230,8 @@ def aplicar_por_timepoint(
     for t in range(T):
         bloque = canal_data[t, :, :, :]
 
-        if isinstance(metodo, MetodoConReferencia):
+        #if isinstance(metodo, MetodoConReferencia):
+        if es_metodo_con_referencia(metodo):
             procesado = metodo(bloque, bloque)
         else:
             procesado = metodo(bloque)
@@ -255,7 +265,8 @@ def aplicar_por_corte_espaciotemporal(
         for z in range(Z):
             slice_2d = canal_data[t, z]
 
-            if isinstance(metodo, MetodoConReferencia):
+            #if isinstance(metodo, MetodoConReferencia):
+            if es_metodo_con_referencia(metodo):
                 procesado = metodo(slice_2d, slice_2d)
             else:
                 procesado = metodo(slice_2d)
@@ -288,7 +299,8 @@ def aplicar_por_volumen_3d(
     for t in range(T):
         volumen = canal_data[t]
 
-        if isinstance(metodo, MetodoConReferencia):
+        #if isinstance(metodo, MetodoConReferencia):
+        if es_metodo_con_referencia(metodo):
             procesado = metodo(volumen, volumen)
         else:
             procesado = metodo(volumen)
@@ -316,7 +328,8 @@ def aplicar_con_referencia(
 
     SOLO válido para MetodoConReferencia
     """
-    if not isinstance(metodo, MetodoConReferencia):
+    #if not isinstance(metodo, MetodoConReferencia):
+    if not es_metodo_con_referencia(metodo):
         raise TypeError("Este método no soporta referencia externa")
 
     T, Z, Y, X = canal_data.shape
@@ -329,3 +342,20 @@ def aplicar_con_referencia(
             resultado[t, z] = metodo(referencia, canal_data[t, z])
 
     return resultado
+
+def adaptar_metodo(metodo) -> Callable:
+    """
+    Devuelve el método tal cual.
+
+    Las estrategias (aplicar_global, aplicar_por_corte_z, etc.) ya hacen
+    el dispatch de polimorfismo internamente vía:
+
+        isinstance(metodo, MetodoConReferencia)
+
+    Este wrapper existe para que Controlador_Base tenga un punto de extensión
+    sobreescribible en subclases que necesiten wrapping adicional
+    (ej: logging, memoización, conversión de firma).
+
+    Para el caso base: identidad pura.
+    """
+    return metodo

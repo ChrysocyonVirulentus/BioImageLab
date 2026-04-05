@@ -9,7 +9,16 @@ from .Categoria_Operacion import CategoriaOperacion, TipoDato
 from .Validacion_Operacion import es_compatible, obtener_adaptador, tipo_salida as tipo_salida_default
 from .Registro_Controladores import CONTROLADORES
 
-
+# Importar estrategias para el mapeo
+from ..controlador.Estrategias_Aplicacion import (
+    Global,
+    PorCorteZ,
+    PorTimepoint,
+    PorCorteEspaciotemporal,
+    PorVolumen3D,
+    ConReferencia,
+    TipoAplicacion,
+)
 class ConstructorFlujoTrabajo:
 
     def __init__(self):
@@ -61,6 +70,12 @@ class ConstructorFlujoTrabajo:
         dominio       = op_cfg.get("dominio") or self._inferir_dominio(categoria)
         canal         = op_cfg.get("canal", None)
 
+        # CORREGIDO: leer tipo_aplicacion del YAML y mapearlo a instancia
+        tipo_aplicacion = self._mapear_tipo_aplicacion(
+            op_cfg.get("tipo_aplicacion", None),
+            categoria
+        )
+
         controlador = CONTROLADORES[dominio]
 
         # Controladores que no usan tipo_aplicacion ni canal (Modelador, Analizador)
@@ -70,6 +85,7 @@ class ConstructorFlujoTrabajo:
             categoria     = categoria,
             params        = params,
             canal         = canal,
+            tipo_aplicacion = tipo_aplicacion, 
         )
 
         self._validar_conexion(nodo_entrada, operacion)
@@ -97,28 +113,15 @@ class ConstructorFlujoTrabajo:
         if nodo_entrada not in self.grafo.nodos:
             return
 
-        nodo = self.grafo.nodos[nodo_entrada]
-
-        # CORREGIDO: NodoPipeline tiene tipo_dato, no categoria
-        # La validación de orden se hace por tipo_dato del nodo de entrada
-        # vs tipo_dato esperado por la nueva operación
-        tipo_nodo = nodo.tipo_dato
-
-        # Verificar compatibilidad de tipo de dato
-        # (la validación de orden de categorías ocurre en Operacion._validar_semantica)
-        cat_nueva = operacion.categoria
-
         entrantes_prev = self.grafo.entrantes(nodo_entrada)
         if not entrantes_prev:
-            return  # nodo raíz — sin validación previa
+            return
 
-        # Obtener categoría previa desde la arista entrante
-        cat_prev = entrantes_prev[-1].operacion.categoria
+        cat_prev  = entrantes_prev[-1].operacion.categoria
+        cat_nueva = operacion.categoria
 
         if not cat_prev.puede_preceder_a(cat_nueva):
-            raise ValueError(
-                f"Orden inválido: {cat_prev.name} → {cat_nueva.name}"
-            )
+            raise ValueError(f"Orden inválido: {cat_prev.name} → {cat_nueva.name}")
 
         if not es_compatible(cat_prev, cat_nueva):
             adaptador = obtener_adaptador(cat_prev, cat_nueva)
@@ -129,9 +132,55 @@ class ConstructorFlujoTrabajo:
             print(f"[WARN] Adaptador requerido: {adaptador}")
 
 
+
     # =========================================================
     # HELPERS
     # =========================================================
+
+    def _mapear_tipo_aplicacion(
+        self,
+        nombre: Optional[str],
+        categoria: CategoriaOperacion,
+    ) -> Optional[TipoAplicacion]:
+        """
+        Convierte el string del YAML a instancia de estrategia.
+
+        Si no se especifica en el YAML, infiere un default seguro
+        según la categoría:
+          - Dominios de imagen (filtro, realce, etc.) → PorCorteEspaciotemporal
+            porque los métodos esperan [Y,X] 2D
+          - Cuantificador / Modelador / Analizador → None
+            porque no usan estrategia (_requiere_estrategia=False)
+        """
+        # Categorías que no usan estrategia
+        sin_estrategia = {
+            CategoriaOperacion.CUANTIFICADOR,
+            CategoriaOperacion.MODELADOR,
+            CategoriaOperacion.ANALIZADOR,
+        }
+
+        if categoria in sin_estrategia:
+            return None
+
+        # Mapeo explícito desde string YAML
+        if nombre is not None:
+            mapping = {
+                "global":                    Global(),
+                "por_corte_z":               PorCorteZ(),
+                "por_timepoint":             PorTimepoint(),
+                "por_corte_espaciotemporal": PorCorteEspaciotemporal(),
+                "por_volumen_3d":            PorVolumen3D(),
+                "con_referencia":            ConReferencia(),
+            }
+            if nombre not in mapping:
+                raise ValueError(
+                    f"tipo_aplicacion desconocido: '{nombre}'. "
+                    f"Válidos: {list(mapping.keys())}"
+                )
+            return mapping[nombre]
+
+        # Default: PorCorteEspaciotemporal — seguro para métodos que esperan [Y,X]
+        return PorCorteEspaciotemporal()
 
     def _mapear_categoria(self, nombre: str) -> CategoriaOperacion:
         mapping = {

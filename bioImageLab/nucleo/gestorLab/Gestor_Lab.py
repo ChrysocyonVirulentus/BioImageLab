@@ -25,16 +25,16 @@ class GestorLab:
     Punto de entrada único del sistema.
 
     Responsabilidades:
-      - Registrar y almacenar FlujoTrabajo por nombre
-      - Construir flujos desde config (YAML / JSON / dict)
-      - Validar el pipeline antes de ejecutar
-      - Ejecutar con el input correcto según el tipo de entrada
+        - Registrar y almacenar FlujoTrabajo por nombre
+        - Construir flujos desde config (YAML / JSON / dict)
+        - Validar el pipeline antes de ejecutar
+        - Ejecutar con el input correcto según el tipo de entrada
 
     Tipos de entrada soportados:
-      - Ruta de imagen  → BioImagenData  (pipelines imagen)
-      - BioImagenData   → directo        (cuando ya está cargada)
-      - pd.DataFrame    → directo        (pipelines Modelador/Analizador)
-      - dict            → directo        (cualquier otro input)
+        - Ruta de imagen  → BioImagenData  (pipelines imagen)
+        - BioImagenData   → directo        (cuando ya está cargada)
+        - pd.DataFrame    → directo        (pipelines Modelador/Analizador)
+        - dict            → directo        (cualquier otro input)
     """
 
     def __init__(self):

@@ -81,6 +81,17 @@ class Controlador_Segmentador(Controlador_Base):
     # HOOKS SOBREESCRITOS
     # =========================================================
 
+    def _preprocesar(self, data: BioImagenData, canal: int) -> np.ndarray:
+        arr = data.datos[:, :, canal, :, :]
+
+        if arr.dtype not in (np.uint8, np.uint16):
+            raise TypeError(
+                f"Segmentación requiere uint8 o uint16, recibió {arr.dtype}. "
+                f"Use normalización 'to_uint8' o 'to_uint16'."
+            )
+
+        return arr
+
     def _postprocesar(
         self,
         data: BioImagenData,
