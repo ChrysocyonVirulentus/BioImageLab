@@ -1,22 +1,30 @@
-ruta_imagen : "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/glp1_1.ids"
-
 nombre_pipeline: "mi_pipeline"
+ruta_imagen: "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/glp1_1.ids"
+ruta_log:    "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/mi_pipeline_yaml.log"
 
 etapas:
   - preprocesamiento:
       - metodo: max_norm
+        dominio: normalizacion
         canal: 0
-        tipo_aplicacion: global        # ← opcional, acepta cualquier shape
+        tipo_aplicacion: global
 
   - filtracion:
       - metodo: fft_pasabajo
-        params:
-          radio: 30
+        dominio: filtracion
         canal: 0
-        tipo_aplicacion: por_corte_espaciotemporal   # ← pasa [Y,X] al método
-
-  - filtracion:
-      - metodo: gaussiano
+        tipo_aplicacion: por_corte_espaciotemporal
         params:
-          sigma: 1.5
-        canal: 0   
+          radio: 5
+
+  - preprocesamiento:
+      - metodo: to_uint8
+        dominio: normalizacion
+        canal: 0
+        tipo_aplicacion: global
+
+  - segmentacion:
+      - metodo: otsu
+        dominio: segmentacion
+        canal: 0
+        tipo_aplicacion: por_corte_espaciotemporal
