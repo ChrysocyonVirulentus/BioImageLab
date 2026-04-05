@@ -29,6 +29,7 @@ class ErrorPipeline:
 # Para los logs de error o exito:
 class NivelLog(Enum):
     INFO = "info"
+    WARN  = "warn"
     ERROR = "error"
 
 @dataclass(frozen=True)

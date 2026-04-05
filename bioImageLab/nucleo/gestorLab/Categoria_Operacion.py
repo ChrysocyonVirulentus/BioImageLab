@@ -1,31 +1,45 @@
 # === gestorLab/Categoria_Operacion.py ===
 
+from __future__ import annotations
+
 from enum import Enum, auto
-from typing import Set, List
+from typing import Set, List, Tuple
 
-
-# =========================================================
-# TIPOS DE DATOS DEL PIPELINE
-# =========================================================
 
 class TipoDato(Enum):
-    IMAGEN       = "imagen"
-    MASCARA      = "mascara"
-    FEATURES     = "features"
-    TABLA        = "tabla"
-    MODELO       = "modelo"
+    IMAGEN        = "imagen"
+    MASCARA       = "mascara"
+    FEATURES      = "features"
+    TABLA         = "tabla"
+    MODELO        = "modelo"
     VISUALIZACION = "viz"
-    NINGUNA      = "ninguna"
+    NINGUNA       = "ninguna"
 
-
-# =========================================================
-# CATEGORIAS (ETAPAS DEL PIPELINE)
-# =========================================================
 
 class CategoriaOperacion(Enum):
     """
-    Define la ETAPA del pipeline (orden lógico).
-    NO contiene lógica de tipos → eso va en Validaciones.
+    Etapas del pipeline con contratos de dos niveles:
+
+      dependencias_duras  → bloquean ejecución si no se cumplen
+      dependencias_blandas → warnings en el log, no bloquean
+
+    Contratos reales del dominio:
+      PREPROCESAMIENTO  → sin requisitos (es el inicio)
+      FILTRACION        → requiere haber normalizado (PREPROCESAMIENTO)
+      REALZADOR         → requiere PREPROCESAMIENTO
+      TRANSFORMADOR     → requiere PREPROCESAMIENTO
+      SEGMENTADOR       → requiere PREPROCESAMIENTO
+                          recomienda FILTRACION o REALZADOR
+      CUANTIFICADOR     → requiere PREPROCESAMIENTO + SEGMENTADOR
+      MODELADOR         → requiere CUANTIFICADOR
+      ANALIZADOR        → sin requisitos duros (puede analizar cualquier cosa)
+
+    Flexibilidad intencional:
+      - N filtrados seguidos: OK
+      - N realzados seguidos: OK
+      - Filtrado + Realzado + Filtrado: OK
+      - Saltar filtrado e ir directo a segmentación: WARNING, no error
+      - SEGMENTADOR sin FILTRACION: WARNING (puede dar peores resultados)
     """
 
     PREPROCESAMIENTO = auto()
@@ -38,68 +52,153 @@ class CategoriaOperacion(Enum):
     ANALIZADOR       = auto()
 
     # =========================================================
-    # ORDEN
+    # ORDEN Y PRECEDENCIA
     # =========================================================
 
     def orden(self) -> int:
         return list(CategoriaOperacion).index(self)
 
-    def puede_preceder_a(self, otra):
-        reglas = {
-            CategoriaOperacion.PREPROCESAMIENTO: {
-                CategoriaOperacion.PREPROCESAMIENTO,
-                CategoriaOperacion.FILTRACION,
-                CategoriaOperacion.REALZADOR,
-                CategoriaOperacion.TRANSFORMADOR,
-                CategoriaOperacion.SEGMENTADOR,
-            },
+    def puede_preceder_a(self, otra: "CategoriaOperacion") -> bool:
+        """
+        Define qué categoría puede conectarse a cuál en el grafo.
+        Permisivo dentro del dominio de imagen, estricto en el salto a datos.
+        """
+        # Dominio imagen: todo puede conectar con todo dentro del dominio
+        dominio_imagen = {
+            CategoriaOperacion.PREPROCESAMIENTO,
+            CategoriaOperacion.FILTRACION,
+            CategoriaOperacion.REALZADOR,
+            CategoriaOperacion.TRANSFORMADOR,
+            CategoriaOperacion.SEGMENTADOR,
+        }
 
+        if self in dominio_imagen and otra in dominio_imagen:
+            return True
+
+        # Saltos explícitos al dominio tabular/análisis
+        reglas_cruce = {
+            CategoriaOperacion.SEGMENTADOR:   {CategoriaOperacion.CUANTIFICADOR,
+                                               CategoriaOperacion.ANALIZADOR},
+            CategoriaOperacion.CUANTIFICADOR: {CategoriaOperacion.MODELADOR,
+                                               CategoriaOperacion.ANALIZADOR},
+            CategoriaOperacion.MODELADOR:     {CategoriaOperacion.ANALIZADOR},
+            CategoriaOperacion.ANALIZADOR:    set(),
+        }
+
+        return otra in reglas_cruce.get(self, set())
+
+    # =========================================================
+    # DEPENDENCIAS DURAS — bloquean ejecución
+    # =========================================================
+
+    def dependencias_duras(self) -> Set["CategoriaOperacion"]:
+        """
+        Requisitos mínimos sin los cuales la operación no tiene sentido.
+        Si no se cumplen → Err, el pipeline no ejecuta.
+        """
+        deps: dict[CategoriaOperacion, Set[CategoriaOperacion]] = {
+            CategoriaOperacion.PREPROCESAMIENTO: set(),
+
+            # Filtrar sin normalizar produce resultados sin sentido
             CategoriaOperacion.FILTRACION: {
-                CategoriaOperacion.FILTRACION,
                 CategoriaOperacion.PREPROCESAMIENTO,
-                CategoriaOperacion.REALZADOR,
-                CategoriaOperacion.TRANSFORMADOR,
-                CategoriaOperacion.SEGMENTADOR,
             },
 
             CategoriaOperacion.REALZADOR: {
-                CategoriaOperacion.REALZADOR,
-                CategoriaOperacion.FILTRACION,
                 CategoriaOperacion.PREPROCESAMIENTO,
-                CategoriaOperacion.TRANSFORMADOR,
-                CategoriaOperacion.SEGMENTADOR,
             },
 
             CategoriaOperacion.TRANSFORMADOR: {
-                CategoriaOperacion.TRANSFORMADOR,
                 CategoriaOperacion.PREPROCESAMIENTO,
-                CategoriaOperacion.FILTRACION,
-                CategoriaOperacion.REALZADOR,
-                CategoriaOperacion.SEGMENTADOR,
             },
 
             CategoriaOperacion.SEGMENTADOR: {
-                CategoriaOperacion.SEGMENTADOR,
-                CategoriaOperacion.CUANTIFICADOR,
-                CategoriaOperacion.ANALIZADOR,
+                CategoriaOperacion.PREPROCESAMIENTO,
             },
 
+            # Cuantificar sin segmentar no tiene sentido biológico
             CategoriaOperacion.CUANTIFICADOR: {
-                CategoriaOperacion.MODELADOR,
-                CategoriaOperacion.ANALIZADOR,
+                CategoriaOperacion.PREPROCESAMIENTO,
+                CategoriaOperacion.SEGMENTADOR,
             },
 
+            # Modelar sin features cuantificadas no tiene sentido
             CategoriaOperacion.MODELADOR: {
-                CategoriaOperacion.ANALIZADOR,
+                CategoriaOperacion.CUANTIFICADOR,
             },
 
+            # Analizador es libre — puede analizar cualquier cosa
             CategoriaOperacion.ANALIZADOR: set(),
         }
-
-        return otra in reglas.get(self, set())
+        return deps.get(self, set())
 
     # =========================================================
-    # PROPIEDADES PIPELINE (DAG)
+    # DEPENDENCIAS BLANDAS — warnings en el log, no bloquean
+    # =========================================================
+
+    def dependencias_blandas(self) -> Set["CategoriaOperacion"]:
+        """
+        Etapas recomendadas para mejores resultados.
+        Si no se cumplen → LogEvento WARNING, la ejecución continúa.
+        """
+        deps: dict[CategoriaOperacion, Set[CategoriaOperacion]] = {
+            # Segmentar sin filtrar puede dar peores resultados
+            CategoriaOperacion.SEGMENTADOR: {
+                CategoriaOperacion.FILTRACION,
+            },
+
+            # Cuantificar sin haber realzado puede perder señal
+            CategoriaOperacion.CUANTIFICADOR: {
+                CategoriaOperacion.FILTRACION,
+            },
+
+            # El resto no tiene recomendaciones
+            CategoriaOperacion.PREPROCESAMIENTO: set(),
+            CategoriaOperacion.FILTRACION:       set(),
+            CategoriaOperacion.REALZADOR:        set(),
+            CategoriaOperacion.TRANSFORMADOR:    set(),
+            CategoriaOperacion.MODELADOR:        set(),
+            CategoriaOperacion.ANALIZADOR:       set(),
+        }
+        return deps.get(self, set())
+
+    # =========================================================
+    # VALIDACIÓN CON DOS NIVELES
+    # =========================================================
+
+    def validar_dependencias(
+        self,
+        presentes: Set["CategoriaOperacion"]
+    ) -> Tuple[bool, List[str], List[str]]:
+        """
+        Retorna (es_valido, errores_duros, warnings_blandos).
+
+        errores_duros  → bloquean
+        warnings_blandos → van al log, no bloquean
+        """
+        faltantes_duros = self.dependencias_duras() - presentes
+        faltantes_blandos = self.dependencias_blandas() - presentes
+
+        errores = []
+        warnings = []
+
+        if faltantes_duros:
+            nombres = sorted(c.name for c in faltantes_duros)
+            errores.append(
+                f"{self.name} requiere obligatoriamente: {', '.join(nombres)}"
+            )
+
+        if faltantes_blandos:
+            nombres = sorted(c.name for c in faltantes_blandos)
+            warnings.append(
+                f"{self.name} recomienda haber ejecutado: {', '.join(nombres)} "
+                f"(resultados pueden ser subóptimos)"
+            )
+
+        return len(errores) == 0, errores, warnings
+
+    # =========================================================
+    # PROPIEDADES
     # =========================================================
 
     @property
@@ -112,60 +211,6 @@ class CategoriaOperacion(Enum):
     @property
     def requiere_merge(self) -> bool:
         return self == CategoriaOperacion.CUANTIFICADOR
-
-    # =========================================================
-    # DEPENDENCIAS
-    # =========================================================
-
-    def dependencias_estrictas(self) -> Set["CategoriaOperacion"]:
-        deps = {
-            CategoriaOperacion.PREPROCESAMIENTO: set(),
-
-            CategoriaOperacion.FILTRACION: {
-                CategoriaOperacion.PREPROCESAMIENTO,
-                CategoriaOperacion.FILTRACION
-            },
-
-            CategoriaOperacion.REALZADOR: {
-                CategoriaOperacion.FILTRACION,
-                CategoriaOperacion.PREPROCESAMIENTO
-            },
-
-            CategoriaOperacion.TRANSFORMADOR: {
-                CategoriaOperacion.FILTRACION,
-                CategoriaOperacion.PREPROCESAMIENTO
-            },
-
-            CategoriaOperacion.SEGMENTADOR: {
-                CategoriaOperacion.FILTRACION,
-                CategoriaOperacion.PREPROCESAMIENTO,
-            },
-
-            CategoriaOperacion.CUANTIFICADOR: {
-                CategoriaOperacion.PREPROCESAMIENTO,
-                CategoriaOperacion.SEGMENTADOR,
-            },
-
-            CategoriaOperacion.MODELADOR: {
-                CategoriaOperacion.CUANTIFICADOR
-            },
-
-            CategoriaOperacion.ANALIZADOR: set(),
-        }
-        return deps.get(self, set())
-
-    def validar_dependencias(
-        self,
-        presentes: Set["CategoriaOperacion"]
-    ) -> tuple[bool, List[str]]:
-
-        faltantes = self.dependencias_estrictas() - presentes
-
-        if not faltantes:
-            return True, []
-
-        nombres = [c.name for c in faltantes]
-        return False, [f"{self.name} requiere: {', '.join(nombres)}"]
 
     def __repr__(self) -> str:
         return f"{self.name}({self.orden()})"

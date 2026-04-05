@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Set, List
 
-from ..controlador.Resultado_Either import Resultado, Ok, Err
+from ..controlador.Resultado_Either import Resultado, Ok, Err, LogEvento, NivelLog
 from ..controlador.Controlador_BioImagen import ErrorBioImagen
 
 from .Flujo_Trabajo import GrafoPipeline
@@ -18,82 +18,90 @@ from .Validacion_Operacion import (
 )
 
 
-def validar_pipeline(grafo: GrafoPipeline) -> Resultado[bool, ErrorBioImagen]:
+def validar_pipeline(
+    grafo: GrafoPipeline,
+) -> Resultado[List[LogEvento], ErrorBioImagen]:
     """
-    Valida el pipeline completo antes de ejecutar.
-      ✔ DAG sin ciclos
-      ✔ Orden de categorías
-      ✔ Compatibilidad semántica de tipos de dato
-      ✔ Dependencias entre etapas
-      ✔ Adaptadores disponibles cuando son necesarios
-    """
-    errores:  List[str] = []
-    warnings: List[str] = []
+    Valida el pipeline con dos niveles de severidad.
 
-    # ── 1. Validar DAG ──────────────────────────────────────────
+    Retorna:
+      Ok(lista_de_warnings)  → pipeline válido, warnings acumulados en el valor
+      Err(ErrorBioImagen)    → pipeline inválido, errores duros
+
+    El llamador (GestorLab) puede inyectar los warnings al log
+    del Resultado de ejecución si lo desea.
+    """
+    errores_duros: List[str]  = []
+    warnings:      List[str]  = []
+
+    # ── 1. DAG sin ciclos ────────────────────────────────────
     try:
         grafo.orden_topologico()
     except Exception as e:
         return Err(ErrorBioImagen(
             etapa="validacion_pipeline",
             mensaje=f"Grafo inválido (ciclo detectado): {e}",
-            causa=e
+            causa=e,
         ))
 
-    # ── 2. Validar cada arista ───────────────────────────────────
+    # ── 2. Validar cada arista ───────────────────────────────
     for arista in grafo.aristas:
         op         = arista.operacion
         cat_actual = op.categoria
 
-        entrantes          = grafo.entrantes(arista.origen)
+        entrantes = grafo.entrantes(arista.origen)
+
+        # Categorías que ya están presentes antes de esta operación
         categorias_previas: Set[CategoriaOperacion] = {
             a.operacion.categoria for a in entrantes
         }
 
-        # 2.1 Dependencias declaradas en CategoriaOperacion
-        ok, errs = cat_actual.validar_dependencias(categorias_previas)
-        if not ok:
-            errores.extend(f"[{op.nombre}] {e}" for e in errs)
+        # 2.1 Dependencias con dos niveles
+        valido, errs, warns = cat_actual.validar_dependencias(categorias_previas)
 
-        # 2.2 Compatibilidad con cada operación previa
+        errores_duros.extend(f"[{op.nombre}] {e}" for e in errs)
+        warnings.extend(f"[{op.nombre}] {w}" for w in warns)
+
+        # 2.2 Compatibilidad semántica con operaciones previas
         for a_prev in entrantes:
             cat_prev = a_prev.operacion.categoria
 
             if not cat_prev.puede_preceder_a(cat_actual):
-                errores.append(
-                    f"Orden inválido: {cat_prev.name} → {cat_actual.name}"
+                errores_duros.append(
+                    f"Conexión inválida: {cat_prev.name} → {cat_actual.name}"
                 )
 
-            if not es_compatible(cat_prev, cat_actual):
+            elif not es_compatible(cat_prev, cat_actual):
                 if requiere_adaptador(cat_prev, cat_actual):
                     adapter = obtener_adaptador(cat_prev, cat_actual)
                     if adapter:
                         warnings.append(
-                            f"Adaptador sugerido '{adapter}': "
+                            f"Adaptador necesario '{adapter}': "
                             f"{cat_prev.name} → {cat_actual.name}"
                         )
                     else:
-                        errores.append(
+                        errores_duros.append(
                             f"Incompatibilidad sin adaptador: "
                             f"{cat_prev.name} → {cat_actual.name}"
                         )
-                else:
-                    errores.append(
-                        f"Incompatibilidad: {cat_prev.name} → {cat_actual.name}"
-                    )
 
-    # ── 3. Resultado ─────────────────────────────────────────────
-    if warnings:
-        for w in warnings:
-            print(f"[WARN] {w}")
-
-    if errores:
-        # CORREGIDO: causa debe ser Exception|None, no dict
-        detalle = "\n".join(errores)
+    # ── 3. Resultado ─────────────────────────────────────────
+    if errores_duros:
+        detalle = "\n".join(errores_duros)
         return Err(ErrorBioImagen(
             etapa="validacion_pipeline",
-            mensaje=f"Pipeline inválido ({len(errores)} errores):\n{detalle}",
-            causa=ValueError(detalle)
+            mensaje=f"Pipeline inválido ({len(errores_duros)} errores):\n{detalle}",
+            causa=ValueError(detalle),
         ))
 
-    return Ok(True)
+    # Warnings como LogEventos — el llamador los gestiona
+    log_warnings = [
+        LogEvento(
+            etapa="validacion_pipeline",
+            mensaje=w,
+            nivel=NivelLog.ERROR,   # NivelLog.WARNING cuando lo agregues al enum
+        )
+        for w in warnings
+    ]
+
+    return Ok(log_warnings)

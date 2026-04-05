@@ -10,8 +10,9 @@ from typing import Dict, Any, Optional, Union
 from .Flujo_Trabajo import FlujoTrabajo
 from .Constructor_Flujo_Trabajo import ConstructorFlujoTrabajo
 from .Validar_Flujo_Trabajo import validar_pipeline
+from .Log import RecolectorLog
 
-from ..controlador.Resultado_Either import Resultado, Ok, Err
+from ..controlador.Resultado_Either import Resultado, Ok, Err, LogEvento, NivelLog
 from ..controlador.Controlador_BioImagen import (
     ControladorBioImagen,
     BioImagenData,
@@ -23,6 +24,12 @@ from ..controlador.Controlador_BioImagen import (
 class GestorLab:
     """
     Punto de entrada único del sistema.
+
+    El resultado de ejecutar ahora es:
+        Ok((salida_dict, logs))   → éxito con lista de LogEvento
+        Err(error)                → fallo, el error lleva su _log interno
+
+    Si el YAML o JSON tiene 'ruta_log', los logs se guardan automáticamente.
 
     Responsabilidades:
         - Registrar y almacenar FlujoTrabajo por nombre
@@ -39,15 +46,17 @@ class GestorLab:
 
     def __init__(self):
         self._flujos: Dict[str, FlujoTrabajo] = {}
+        self._rutas_log: Dict[str, Optional[Path]] = {}   # por pipeline
 
     # =========================================================
     # REGISTRO MANUAL
     # =========================================================
 
-    def registrar(self, flujo: FlujoTrabajo) -> None:
+    def registrar(self, flujo: FlujoTrabajo, ruta_log: Optional[Path] = None) -> None:
         if not flujo.nombre:
             raise ValueError("FlujoTrabajo debe tener nombre antes de registrar")
-        self._flujos[flujo.nombre] = flujo
+        self._flujos[flujo.nombre]    = flujo
+        self._rutas_log[flujo.nombre] = ruta_log
 
     def obtener(self, nombre: str) -> FlujoTrabajo:
         if nombre not in self._flujos:
@@ -63,15 +72,16 @@ class GestorLab:
 
     def registrar_desde_config(self, config: Dict[str, Any]) -> FlujoTrabajo:
         """Construye y registra un pipeline desde un dict de configuración."""
-        flujo = ConstructorFlujoTrabajo().construir(config)
-        self.registrar(flujo)
+        flujo    = ConstructorFlujoTrabajo().construir(config)
+        ruta_log = Path(config["ruta_log"]) if "ruta_log" in config else None
+        self.registrar(flujo, ruta_log)
         return flujo
 
     def registrar_desde_yaml(self, ruta: Union[str, Path]) -> FlujoTrabajo:
         """Construye y registra un pipeline desde un archivo YAML."""
         ruta = Path(ruta)
         if not ruta.exists():
-            raise FileNotFoundError(f"Archivo YAML no encontrado: {ruta}")
+            raise FileNotFoundError(f"YAML no encontrado: {ruta}")
         with open(ruta, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
         return self.registrar_desde_config(config)
@@ -80,7 +90,7 @@ class GestorLab:
         """Construye y registra un pipeline desde un archivo JSON."""
         ruta = Path(ruta)
         if not ruta.exists():
-            raise FileNotFoundError(f"Archivo JSON no encontrado: {ruta}")
+            raise FileNotFoundError(f"JSON no encontrado: {ruta}")
         with open(ruta, "r", encoding="utf-8") as f:
             config = json.load(f)
         return self.registrar_desde_config(config)
@@ -91,25 +101,22 @@ class GestorLab:
 
     def ejecutar_desde_ruta(
         self,
-        nombre: str,
-        ruta_imagen: Union[str, Path],
-        modo: ModoImagen = ModoImagen.AUTO,
-        validar: bool = True,
-        debug: bool = False,
-    ) -> Resultado[Dict[str, Any], Any]:
-        """
-        Carga la imagen desde disco y ejecuta el pipeline.
-        Flujo principal para pipelines de bioimagen.
-        """
+        nombre:       str,
+        ruta_imagen:  Union[str, Path],
+        modo:         ModoImagen = ModoImagen.AUTO,
+        validar:      bool = True,
+        debug:        bool = False,
+    )  -> Resultado[Tuple[Dict[str, Any], List[LogEvento]], Any]:
+
         flujo = self._obtener_flujo(nombre)
+        recolector = RecolectorLog(nombre)
 
-        # Validación pre-ejecución
         if validar:
-            resultado_val = self._validar(flujo, debug)
-            if resultado_val.es_err():
-                return resultado_val
+            val = self._validar(flujo, debug, recolector)
+            if val.es_err():
+                self._guardar_si_corresponde(nombre, recolector)
+                return val
 
-        # Carga
         if debug:
             print(f"[GestorLab] Cargando imagen: {ruta_imagen}")
 
@@ -117,14 +124,23 @@ class GestorLab:
         carga = ctrl.cargar_ImagenResultado(modo)
 
         if carga.es_err():
+            recolector.agregar_manual(
+                etapa="carga", mensaje=str(carga.error.mensaje), nivel=NivelLog.ERROR
+            )
+            self._guardar_si_corresponde(nombre, recolector)
             return carga
 
         data = carga.unwrap()
+        recolector.agregar_manual(
+            etapa="carga",
+            mensaje=f"Imagen cargada: shape={data.dims.shape} canales={data.canales}",
+        )
 
         if debug:
-            print(f"[GestorLab] Imagen cargada: {data.dims.shape} canales={data.canales}")
+            print(f"[GestorLab] Imagen cargada: {data.dims.shape}")
 
-        return self._ejecutar(flujo, data, debug)
+        return self._ejecutar(flujo, data, debug, nombre, recolector)
+
 
     def ejecutar_desde_data(
         self,
@@ -132,19 +148,21 @@ class GestorLab:
         data: BioImagenData,
         validar: bool = True,
         debug: bool = False,
-    ) -> Resultado[Dict[str, Any], Any]:
+    ) -> Resultado[Tuple[Dict[str, Any], List[LogEvento]], Any]:
         """
         Ejecuta el pipeline con BioImagenData ya cargada.
         Útil para re-ejecutar sin releer el disco.
         """
-        flujo = self._obtener_flujo(nombre)
+        flujo      = self._obtener_flujo(nombre)
+        recolector = RecolectorLog(nombre)
 
         if validar:
-            resultado_val = self._validar(flujo, debug)
-            if resultado_val.es_err():
-                return resultado_val
+            val = self._validar(flujo, debug, recolector)
+            if val.es_err():
+                self._guardar_si_corresponde(nombre, recolector)
+                return val
 
-        return self._ejecutar(flujo, data, debug)
+        return self._ejecutar(flujo, data, debug, nombre, recolector)
 
     # =========================================================
     # EJECUCIÓN — entrada tabular (Modelador / Analizador)
@@ -155,20 +173,22 @@ class GestorLab:
         nombre: str,
         df,                          # pd.DataFrame — sin importar pandas en este nivel
         validar: bool = True,
-        debug: bool = False,
-    ) -> Resultado[Dict[str, Any], Any]:
+        debug:   bool = False,
+    ) -> Resultado[Tuple[Dict[str, Any], List[LogEvento]], Any]:
         """
         Ejecuta el pipeline con un DataFrame como entrada.
         Flujo principal para pipelines Modelador/Analizador.
         """
-        flujo = self._obtener_flujo(nombre)
+        flujo      = self._obtener_flujo(nombre)
+        recolector = RecolectorLog(nombre)
 
         if validar:
-            resultado_val = self._validar(flujo, debug)
-            if resultado_val.es_err():
-                return resultado_val
+            val = self._validar(flujo, debug, recolector)
+            if val.es_err():
+                self._guardar_si_corresponde(nombre, recolector)
+                return val
 
-        return self._ejecutar(flujo, df, debug)
+        return self._ejecutar(flujo, df, debug, nombre, recolector)
 
     # =========================================================
     # CORE INTERNO
@@ -184,28 +204,51 @@ class GestorLab:
 
     def _validar(
         self,
-        flujo: FlujoTrabajo,
-        debug: bool,
+        flujo:     FlujoTrabajo,
+        debug:     bool,
+        recolector: RecolectorLog,
     ) -> Resultado[bool, Any]:
+
         if debug:
-            print(f"[GestorLab] Validando pipeline '{flujo.nombre}'...")
+            print(f"[GestorLab] Validando '{flujo.nombre}'...")
 
         resultado = validar_pipeline(flujo.grafo)
 
         if resultado.es_err():
+            recolector.agregar_manual(
+                etapa   = "validacion",
+                mensaje = resultado.error.mensaje,
+                nivel   = NivelLog.ERROR,
+            )
             if debug:
-                print(f"[GestorLab] Validación fallida: {resultado.error.mensaje}")
-        elif debug:
-            print(f"[GestorLab] Validación OK")
+                print(f"[GestorLab] ✗ {resultado.error.mensaje}")
+            return resultado
 
-        return resultado
+        # Cosechar warnings de validación
+        for w in resultado.unwrap():
+            recolector.agregar_manual(
+                etapa   = w.etapa,
+                mensaje = w.mensaje,
+                nivel   = NivelLog.WARN,
+            )
+            if debug:
+                print(f"[GestorLab] ⚠ {w.mensaje}")
+
+        if debug:
+            n_warn = len(resultado.unwrap())
+            print(f"[GestorLab] ✓ Validación OK ({n_warn} warnings)")
+
+        return Ok(True)
 
     def _ejecutar(
         self,
-        flujo: FlujoTrabajo,
-        data: Any,
-        debug: bool,
-    ) -> Resultado[Dict[str, Any], Any]:
+        flujo:      FlujoTrabajo,
+        data:       Any,
+        debug:      bool,
+        nombre:     str,
+        recolector: RecolectorLog,
+    ) -> Resultado[Tuple[Dict[str, Any], List[LogEvento]], Any]:
+
         flujo.reset_datos()
 
         if debug:
@@ -213,15 +256,54 @@ class GestorLab:
 
         resultado = flujo.ejecutar(data)
 
-        if debug:
-            if resultado.es_ok():
-                salida = resultado.unwrap()
-                nodos  = list(salida.keys())
-                print(f"[GestorLab] OK — nodos finales: {nodos}")
-            else:
-                print(f"[GestorLab] ERR — {resultado.error.mensaje}")
+        if resultado.es_ok():
+            salida, logs_pipeline = resultado.unwrap()
 
-        return resultado
+            # Cosechar todos los logs del pipeline
+            recolector.cosechar_varios(
+                [Ok(None, tuple(logs_pipeline))]  # envolver para que cosechar los encuentre
+            )
+            # Forma directa más simple:
+            for ev in logs_pipeline:
+                recolector._eventos.append(ev)
+
+            recolector.agregar_manual(
+                etapa   = "pipeline",
+                mensaje = f"Ejecución completada. Nodos finales: {list(salida.keys())}",
+            )
+
+            if debug:
+                print(f"[GestorLab] ✓ OK — nodos: {list(salida.keys())}")
+
+            self._guardar_si_corresponde(nombre, recolector)
+            return Ok((salida, recolector.eventos))
+
+        else:
+            error = resultado.error
+
+            # Cosechar logs que viajan en el Err
+            recolector.cosechar(resultado)
+
+            recolector.agregar_manual(
+                etapa   = "pipeline",
+                mensaje = f"Ejecución fallida: {getattr(error, 'mensaje', str(error))}",
+                nivel   = NivelLog.ERROR,
+            )
+
+            if debug:
+                print(f"[GestorLab] ✗ ERR — {getattr(error, 'mensaje', str(error))}")
+
+            self._guardar_si_corresponde(nombre, recolector)
+            return resultado
+
+    def _guardar_si_corresponde(
+        self, nombre: str, recolector: RecolectorLog
+    ) -> None:
+        ruta = self._rutas_log.get(nombre)
+        if ruta is None:
+            return
+        formato = "json" if ruta.suffix == ".json" else "txt"
+        recolector.guardar(ruta, formato=formato)
 
     # =========================================================
     # DEBUG / VISUALIZACIÓN
@@ -231,15 +313,16 @@ class GestorLab:
         flujo = self._obtener_flujo(nombre)
         grafo = flujo.grafo
 
-        print(f"\n{'='*50}")
-        print(f"  PIPELINE: {nombre}")
-        print(f"{'='*50}")
+        print(f"\n{'='*60}")
+        print(f"  PIPELINE : {nombre}")
+        print(f"{'='*60}")
 
         print(f"\n[NODOS] ({len(grafo.nodos)})")
+        iniciales = {n.id for n in grafo.nodos_iniciales()}
+        finales   = {n.id for n in grafo.nodos_finales()}
         for nodo in grafo.nodos.values():
-            prefijo = "→ " if grafo.nodos_iniciales().__contains__(nodo) else \
-                      "✓ " if nodo in grafo.nodos_finales() else "  "
-            print(f"  {prefijo}{nodo.id} ({nodo.tipo_dato.name})")
+            marca = "→" if nodo.id in iniciales else ("✓" if nodo.id in finales else " ")
+            print(f"  {marca} {nodo.id} ({nodo.tipo_dato.name})")
 
         print(f"\n[ARISTAS] ({len(grafo.aristas)})")
         for arista in grafo.aristas:
@@ -250,7 +333,6 @@ class GestorLab:
         print(f"\n[VALIDACIÓN] {'OK' if ok else f'ERRORES ({len(errores)})'}")
         for e in errores:
             print(f"  ✗ {e}")
-
         print()
 
     def mostrar_orden_ejecucion(self, nombre: str) -> None:
@@ -258,11 +340,11 @@ class GestorLab:
         try:
             orden = flujo.grafo.orden_topologico()
             print(f"\n[Orden topológico — {nombre}]")
-            for i, nodo_id in enumerate(orden):
-                nodo = flujo.grafo.nodos[nodo_id]
-                print(f"  {i+1}. {nodo_id} ({nodo.tipo_dato.name})")
+            for i, nid in enumerate(orden):
+                nodo = flujo.grafo.nodos[nid]
+                print(f"  {i+1}. {nid} ({nodo.tipo_dato.name})")
         except ValueError as e:
             print(f"[ERROR] {e}")
 
     def __repr__(self) -> str:
-        return f"<GestorLab flujos={list(self._flujos.keys())}>"
+        return f"<GestorLab flujos={self.listar()}>"

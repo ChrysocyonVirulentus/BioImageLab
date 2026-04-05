@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Any, Optional, Set
 
-from ..controlador.Resultado_Either import Resultado, Ok, Err
+from ..controlador.Resultado_Either import Resultado, Ok, Err, LogEvento, NivelLog
 from ..controlador.Controlador_BioImagen import ErrorBioImagen
 from .Operacion import Operacion
 from .Categoria_Operacion import TipoDato
@@ -17,9 +17,9 @@ from .Categoria_Operacion import TipoDato
 
 @dataclass
 class NodoPipeline:
-    id: str
+    id:        str
     tipo_dato: TipoDato
-    data: List[Any] = field(default_factory=list)
+    data:      List[Any] = field(default_factory=list)
 
     def __repr__(self):
         return f"<Nodo {self.id} ({self.tipo_dato.name})>"
@@ -71,14 +71,11 @@ class GrafoPipeline:
         return [n for n in self.nodos.values() if not self.salientes(n.id)]
 
     def orden_topologico(self) -> List[str]:
-        """Kahn's Algorithm."""
         in_degree = {n: 0 for n in self.nodos}
         for a in self.aristas:
             in_degree[a.destino] += 1
-
         cola  = [n for n, deg in in_degree.items() if deg == 0]
         orden = []
-
         while cola:
             actual = cola.pop(0)
             orden.append(actual)
@@ -86,10 +83,8 @@ class GrafoPipeline:
                 in_degree[arista.destino] -= 1
                 if in_degree[arista.destino] == 0:
                     cola.append(arista.destino)
-
         if len(orden) != len(self.nodos):
             raise ValueError("El grafo tiene ciclos — no es un DAG válido")
-
         return orden
 
     # -----------------------------
@@ -129,11 +124,11 @@ class GrafoPipeline:
 
 class FlujoTrabajo:
     """
-    Pipeline basado en DAG.
-    Nodo = dato en tránsito. Arista = operación que lo transforma.
+    Pipeline DAG.
 
-    El error que viaja dentro de Resultado puede ser cualquier dataclass
-    con campos 'etapa' y 'mensaje' — no solo ErrorBioImagen.
+    ejecutar() retorna Ok((salida, logs)) donde:
+        salida : Dict[nodo_id, dato_final]
+        logs   : List[LogEvento] cosechados de todas las cajas intermedias
     """
 
     def __init__(self, grafo: GrafoPipeline):
@@ -144,8 +139,13 @@ class FlujoTrabajo:
     # EJECUCIÓN
     # =========================================================
 
-    def ejecutar(self, input_inicial: Any) -> Resultado[Dict[str, Any], Any]:
-
+    def ejecutar(
+        self, input_inicial: Any
+    ) -> Resultado[Tuple[Dict[str, Any], List[LogEvento]], Any]:
+        """
+        Retorna Ok((salida_dict, lista_logs)) o Err(error_enriquecido).
+        Los logs de cada operación se cosechan de las cajas intermedias.
+        """
         try:
             orden = self.grafo.orden_topologico()
         except Exception as e:
@@ -160,21 +160,38 @@ class FlujoTrabajo:
         for nodo in iniciales:
             nodo.data = [input_inicial]
 
+        # Logs acumulados de todas las operaciones
+        logs_acumulados: List[LogEvento] = []
+
         for nodo_id in orden:
             nodo = self.grafo.nodos[nodo_id]
             if not nodo.data:
                 continue
 
-            # Merge simple: tomar el último dato acumulado
             input_data = nodo.data[-1]
 
             for arista in self.grafo.salientes(nodo_id):
                 resultado = arista.operacion.ejecutar(input_data)
 
+                # Cosechar logs antes de abrir la caja
+                log_intermedio = getattr(resultado, "_log", ())
+                logs_acumulados.extend(
+                    ev for ev in log_intermedio if isinstance(ev, LogEvento)
+                )
+
                 if resultado.es_err():
                     error = resultado.error
-                    # replace funciona para cualquier @dataclass(frozen=True)
-                    # siempre que tenga los campos 'etapa' y 'mensaje'
+                    # Agregar log del error antes de propagar
+                    logs_acumulados.append(LogEvento(
+                        etapa   = f"pipeline -> {getattr(error, 'etapa', 'desconocido')}",
+                        mensaje = (
+                            f"[{nodo_id} → {arista.destino}] "
+                            f"'{arista.operacion.nombre}' falló: "
+                            f"{getattr(error, 'mensaje', str(error))}"
+                        ),
+                        nivel    = NivelLog.ERROR,
+                        metadata = {"nodo_origen": nodo_id, "nodo_destino": arista.destino},
+                    ))
                     try:
                         error_enriquecido = replace(
                             error,
@@ -185,9 +202,18 @@ class FlujoTrabajo:
                             )
                         )
                     except Exception:
-                        # Fallback si el error no es dataclass o le faltan campos
                         error_enriquecido = error
-                    return Err(error_enriquecido)
+
+                    # Retornar Err con los logs acumulados hasta el fallo
+                    return Err(error_enriquecido, tuple(logs_acumulados))
+
+                # Log de éxito por operación
+                logs_acumulados.append(LogEvento(
+                    etapa   = arista.operacion.categoria.name.lower(),
+                    mensaje = f"'{arista.operacion.nombre}' OK",
+                    nivel   = NivelLog.INFO,
+                    metadata = {"nodo": nodo_id, "destino": arista.destino},
+                ))
 
                 self.grafo.nodos[arista.destino].data.append(resultado.unwrap())
 
@@ -195,44 +221,37 @@ class FlujoTrabajo:
             n.id: n.data[-1] if n.data else None
             for n in self.grafo.nodos_finales()
         }
-        return Ok(salida)
+
+        return Ok((salida, logs_acumulados))
 
     # =========================================================
     # SUBGRAFOS
     # =========================================================
 
     def subgrafo_desde(self, nodo_id: str) -> GrafoPipeline:
-        visitados: Set[str]           = set()
-        aristas_sub: List[AristaOperacion] = []
-
-        def dfs(actual: str):
+        visitados, aristas_sub = set(), []
+        def dfs(actual):
             if actual in visitados: return
             visitados.add(actual)
             for a in self.grafo.salientes(actual):
-                aristas_sub.append(a)
-                dfs(a.destino)
-
+                aristas_sub.append(a); dfs(a.destino)
         dfs(nodo_id)
         return GrafoPipeline(
-            nodos   = {nid: self.grafo.nodos[nid] for nid in visitados},
-            aristas = aristas_sub
+            nodos={nid: self.grafo.nodos[nid] for nid in visitados},
+            aristas=aristas_sub
         )
 
     def subgrafo_hasta(self, nodo_id: str) -> GrafoPipeline:
-        visitados: Set[str]           = set()
-        aristas_sub: List[AristaOperacion] = []
-
-        def dfs(actual: str):
+        visitados, aristas_sub = set(), []
+        def dfs(actual):
             if actual in visitados: return
             visitados.add(actual)
             for a in self.grafo.entrantes(actual):
-                aristas_sub.append(a)
-                dfs(a.origen)
-
+                aristas_sub.append(a); dfs(a.origen)
         dfs(nodo_id)
         return GrafoPipeline(
-            nodos   = {nid: self.grafo.nodos[nid] for nid in visitados},
-            aristas = aristas_sub
+            nodos={nid: self.grafo.nodos[nid] for nid in visitados},
+            aristas=aristas_sub
         )
 
     # =========================================================
@@ -244,14 +263,10 @@ class FlujoTrabajo:
         for arista in self.grafo.aristas:
             nodo_destino = self.grafo.nodos[arista.destino]
             op           = arista.operacion
-
-            if op.tipo_dato_salida is None:
-                continue
-
+            if op.tipo_dato_salida is None: continue
             if nodo_destino.tipo_dato != op.tipo_dato_salida:
                 errores.append(
-                    f"TipoDato inconsistente en {arista}: "
-                    f"nodo={nodo_destino.tipo_dato.name} "
+                    f"TipoDato inconsistente: nodo={nodo_destino.tipo_dato.name} "
                     f"op={op.tipo_dato_salida.name}"
                 )
         return len(errores) == 0, errores

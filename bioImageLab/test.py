@@ -1,6 +1,10 @@
-from nucleo.gestorLab.Gestor_Lab import GestorLab
+# === test.py ===
 
-DEBUG = True
+from pathlib import Path
+from nucleo.gestorLab.Gestor_Lab import GestorLab
+from nucleo.gestorLab.Log import RecolectorLog
+
+DEBUG        = True
 DEBUG_DETALLE = True
 
 
@@ -9,106 +13,142 @@ def debug_print(*args):
         print(*args)
 
 
-def main():
+def mostrar_salida(salida: dict, logs: list):
+    print("\n=== NODOS FINALES ===")
+    for k, v in salida.items():
+        print(f"\n🔹 {k}")
+        print(f"   Tipo  : {type(v).__name__}")
+        if hasattr(v, "datos"):
+            print(f"   Shape : {v.datos.shape}")
+            print(f"   Dtype : {v.datos.dtype}")
+        elif hasattr(v, "shape"):
+            print(f"   Shape : {v.shape}")
+        if DEBUG_DETALLE:
+            print(f"   Repr  : {repr(v)[:120]}...")
 
-    ruta_imagen = "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/glp1_1.ids"
+    print(f"\n=== LOG DE EJECUCIÓN ({len(logs)} eventos) ===")
+    for ev in logs:
+        icono = {"info": "✓", "warn": "⚠", "error": "✗"}.get(ev.nivel.value, "·")
+        print(f"  [{ev.timestamp}] {icono} [{ev.nivel.value.upper()}] {ev.etapa}")
+        print(f"    {ev.mensaje}")
+        if ev.metadata:
+            for k, v in ev.metadata.items():
+                print(f"    {k}: {v}")
+
+
+def main():
+    ruta_imagen = Path(
+        "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos"
+        "/BioImageLab/bioImageLab/test_data/glp1_1.ids"
+    )
+    ruta_log = Path(
+        "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos"
+        "/BioImageLab/bioImageLab/test_data/mi_pipeline.log"
+    )
 
     config = {
         "nombre_pipeline": "pipeline_test_simple",
+        "ruta_log": str(ruta_log),           # ← el gestor guarda el log automáticamente
         "etapas": [
             {
                 "preprocesamiento": [
-                    {"metodo": "max_norm", "dominio": "normalizacion"}
+                    {
+                        "metodo":          "max_norm",
+                        "dominio":         "normalizacion",
+                        "canal":           0,
+                        "tipo_aplicacion": "global",
+                    }
                 ]
             },
             {
                 "filtracion": [
-                    {"metodo": "fft_pasabajo", "params": {"radio": 5.0}}
+                    {
+                        "metodo":          "fft_pasabajo",
+                        "dominio":         "filtracion",
+                        "canal":           0,
+                        "tipo_aplicacion": "por_corte_espaciotemporal",
+                        "params":          {"radio": 5},
+                    }
                 ]
             },
             {
                 "preprocesamiento": [
-                    {"metodo": "to_uint8"}  
+                    {
+                        "metodo":          "to_uint8",
+                        "dominio":         "normalizacion",
+                        "canal":           0,
+                        "tipo_aplicacion": "global",
+                    }
                 ]
             },
             {
                 "segmentacion": [
-                    {"metodo": "otsu"}
+                    {
+                        "metodo":          "otsu",
+                        "dominio":         "segmentacion",
+                        "canal":           0,
+                        "tipo_aplicacion": "por_corte_espaciotemporal",
+                    }
                 ]
-            }
-        ]
+            },
+        ],
     }
 
     gestor = GestorLab()
 
-    debug_print("\n[DEBUG] Registrando pipeline...")
+    # ── Registro ──────────────────────────────────────────────
+    debug_print("\n[DEBUG] Registrando pipeline desde config...")
     pipeline = gestor.registrar_desde_config(config)
+    debug_print("[DEBUG] Pipeline registrado:", pipeline)
 
-    debug_print("\n[DEBUG] Pipeline:", pipeline)
-
-    print("\n=== DEBUG GRAFO ===")
+    # ── Grafo ─────────────────────────────────────────────────
+    print("\n=== GRAFO ===")
     gestor.mostrar_grafo("pipeline_test_simple")
+    gestor.mostrar_orden_ejecucion("pipeline_test_simple")
 
-    # 🔍 DEBUG ESTRUCTURAL
     if DEBUG_DETALLE:
         debug_print("\n[DEBUG] NODOS:")
         for n in pipeline.grafo.nodos.values():
             debug_print(" -", n)
-
         debug_print("\n[DEBUG] ARISTAS:")
         for a in pipeline.grafo.aristas:
             debug_print(" -", a)
 
-    # ✅ VALIDACIÓN (usar GestorLab, no el pipeline directo)
+    # ── Validación ────────────────────────────────────────────
     debug_print("\n[DEBUG] Validando pipeline...")
-    resultado_val = gestor._validar(pipeline, debug=DEBUG)
-
+    recolector = RecolectorLog(pipeline.nombre)
+    resultado_val = gestor._validar(pipeline, debug=DEBUG, recolector=recolector)
     if resultado_val.es_err():
         print("❌ Pipeline inválido:")
-        print(resultado_val.error)
+        print(resultado_val.error.mensaje)
         return
-    else:
-        debug_print("✅ Pipeline válido")
+    debug_print("✅ Pipeline válido")
 
-    # 🚀 EJECUCIÓN
+    # ── Ejecución ─────────────────────────────────────────────
     print("\n=== EJECUTANDO PIPELINE ===")
-
     resultado = gestor.ejecutar_desde_ruta(
         "pipeline_test_simple",
         ruta_imagen,
-        debug=DEBUG
+        validar=True,
+        debug=DEBUG,
     )
 
-    # 🔥 DEBUG RESULTADO
     debug_print("\n[DEBUG] Resultado raw:", resultado)
-
-    if resultado is None:
-        print("❌ Resultado es None (ERROR SILENCIOSO)")
-        return
 
     if resultado.es_err():
         print("❌ Error en ejecución:")
-        print(resultado.error)
-    else:
-        print("✅ Ejecución exitosa")
+        print(resultado.error.mensaje)
+        print(f"   etapa : {resultado.error.etapa}")
+        if resultado.error.causa:
+            print(f"   causa : {resultado.error.causa}")
+        return
 
-        salida = resultado.unwrap()
+    # ── Salida ────────────────────────────────────────────────
+    print("✅ Ejecución exitosa")
+    salida, logs = resultado.unwrap()
+    mostrar_salida(salida, logs)
 
-        debug_print("[DEBUG] Salida completa:", salida)
-
-        if isinstance(salida, dict):
-            debug_print("[DEBUG] Claves salida:", list(salida.keys()))
-
-        # 📦 Mostrar contenido real
-        for k, v in salida.items():
-            print(f"\n🔹 Nodo final: {k}")
-            print("Tipo:", type(v))
-
-            if hasattr(v, "datos"):
-                print("Shape:", v.datos.shape)
-
-            if DEBUG_DETALLE:
-                print("Contenido:", repr(v))
+    print(f"\n📄 Log guardado en: {ruta_log}")
 
 
 if __name__ == "__main__":
