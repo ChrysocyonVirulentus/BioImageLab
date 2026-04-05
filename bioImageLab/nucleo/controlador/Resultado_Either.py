@@ -15,19 +15,16 @@ F = TypeVar("F") # Failed-Transformation (Nuevo tipo de error su se decide trans
 
 @dataclass(frozen=True)
 class ErrorPipeline:
-    etapa: str  # "lectura", "preprocesamiento", "procesamiento"
+    """Error universal del pipeline — todas las capas pueden convertirse a este."""
+    etapa:   str
     mensaje: str
-    ruta: Path | None = None
-    causa: Exception | None = None
-    
+    metodo:  str            = ""
+    ruta:    Path | None    = None
+    causa:   Exception | None = None
+
     def con_contexto(self, nueva_etapa: str) -> ErrorPipeline:
-        """Añade contexto al error (patrón de error wrapping)"""
-        return ErrorPipeline(
-            etapa=f"{nueva_etapa} -> {self.etapa}",
-            mensaje=self.mensaje,
-            ruta=self.ruta,
-            causa=self.causa
-        )
+        from dataclasses import replace
+        return replace(self, etapa=f"{nueva_etapa} -> {self.etapa}")
 
 # Para los logs de error o exito:
 class NivelLog(Enum):
@@ -36,18 +33,14 @@ class NivelLog(Enum):
 
 @dataclass(frozen=True)
 class LogEvento:
-    etapa: str
-    mensaje: str
-    nivel: NivelLog
-    metadata: Dict[str, Any] = None
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    etapa:     str
+    mensaje:   str
+    nivel:     NivelLog
+    metadata:  Dict[str, Any]  = field(default_factory=dict)
+    timestamp: str             = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_dict(self) -> dict:
-        return {
-            "etapa": self.etapa,
-            "mensaje": self.mensaje,
-            "metadata": self.metadata or {}
-        }
+        return {"etapa": self.etapa, "mensaje": self.mensaje, "metadata": self.metadata}
 
 # La idea de esta arquitectura es que quede a la Haskell de: Resultado = Either + Writer, o sea un  WriterT [Log] (Either Error) a
 class Resultado(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
@@ -110,7 +103,7 @@ class Resultado(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
 @dataclass(frozen=True)
 class Ok(Resultado[T, E]):
     _value: T  # privado por convención
-    _log: tuple[LogEvento, ...] = () 
+    _log:   tuple = ()  # tuple[LogEvento, ...]
 
     @property
     def value(self) -> T:
@@ -149,15 +142,16 @@ class Ok(Resultado[T, E]):
     def unwrap_or_else(self, f: Callable[[E], T]) -> T:
         return self._value
     
-    def agregar_log(self, mensaje: str) -> Ok[T, E]:
-        evento = LogEvento(etapa=etapa, mensaje=mensaje, nivel=NivelLog.INFO)
+    def agregar_log(self, mensaje: str, etapa: str = "", nivel: NivelLog = NivelLog.INFO) -> "Ok[T, E]":
+        # CORREGIDO: 'etapa' era undefined; ahora es parámetro con default
+        evento = LogEvento(etapa=etapa, mensaje=mensaje, nivel=nivel)
         return Ok(self._value, self._log + (evento,))
 
 
 @dataclass(frozen=True)
 class Err(Resultado[T, E]):
     _error: E
-    _log: tuple[LogEvento, ...] = ()
+    _log:   tuple = ()  # tuple[LogEvento, ...]
 
     @property
     def error(self) -> E:
@@ -192,8 +186,9 @@ class Err(Resultado[T, E]):
     def unwrap_or_else(self, f: Callable[[E], T]) -> T:
         return f(self._error)
 
-    def agregar_log(self, mensaje: str) -> Err[T, E]:
-        return Err(self._error, self._log + (mensaje,))
+    def agregar_log(self, mensaje: str, etapa: str = "", nivel: NivelLog = NivelLog.ERROR) -> "Err[T, E]":
+        evento = LogEvento(etapa=etapa, mensaje=mensaje, nivel=nivel)
+        return Err(self._error, self._log + (evento,))
         
 # Simular Do-Notation de Haskell
 def result_do(func: Callable[..., Generator[Resultado[Any, E], Any, Resultado[T, E]]]) -> Callable[..., Resultado[T, E]]:

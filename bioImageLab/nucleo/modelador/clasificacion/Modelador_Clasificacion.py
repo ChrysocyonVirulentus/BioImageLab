@@ -45,6 +45,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.calibration import CalibratedClassifierCV
+from ...gestorLab.Registro_Metodos import registrar_en
 
 # Intentar importar imbalanced-learn (opcional, para manejo avanzado de desbalanceo)
 try:

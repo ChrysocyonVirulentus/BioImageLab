@@ -33,12 +33,12 @@ Módulos del archivo:
     3. Reductores                   PCA, UMAP, tSNE
     4. Pipeline de alto nivel       reducir_desde_dataframe()
     5. Visualización                VisualizadorDimensionalidad
-         - grafico_varianza_pca()
-         - grafico_biplot_pca()
-         - grafico_dendrograma()
-         - grafico_embedding_2d()
-         - grafico_scatter_features()
-         - grafico_raincloud()
+            - grafico_varianza_pca()
+            - grafico_biplot_pca()
+            - grafico_dendrograma()
+            - grafico_embedding_2d()
+            - grafico_scatter_features()
+            - grafico_raincloud()
 
 IMPORTANTE — Separación de responsabilidades:
     Estos métodos NO realizan cuantificación ni normalización de imágenes.
@@ -55,7 +55,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-
+from ...gestorLab.Registro_Metodos import registrar_en
 
 # ─────────────────────────────────────────────────────────────
 # 1. Coherencia estadística
@@ -390,7 +390,7 @@ class ReduccionDimensionalidad:
             raise ValueError("X contiene NaN. Imputar antes de reducir.")
 
 @registrar_en("modelado")
-class PCA(ReduccionDimensionalidad):
+class PCADimensional(ReduccionDimensionalidad):
     """
     Análisis de Componentes Principales via sklearn.decomposition.PCA.
 
@@ -435,10 +435,10 @@ class PCA(ReduccionDimensionalidad):
             n_componentes: Número de CPs a retener.
 
             n_componentes_varianza: Si se especifica (0 < valor ≤ 1),
-                                   selecciona el mínimo K que explica ese
-                                   porcentaje de varianza acumulada.
-                                   Tiene prioridad sobre n_componentes.
-                                   Ejemplo: 0.95 → CPs que explican 95%.
+                                selecciona el mínimo K que explica ese
+                                porcentaje de varianza acumulada.
+                                Tiene prioridad sobre n_componentes.
+                                Ejemplo: 0.95 → CPs que explican 95%.
 
             svd_solver: 'auto', 'full', 'randomized', 'arpack'.
 
@@ -535,7 +535,7 @@ class PCA(ReduccionDimensionalidad):
         )
 
 @registrar_en("modelado")
-class UMAP(ReduccionDimensionalidad):
+class UMAPDimensional(ReduccionDimensionalidad):
     """
     Uniform Manifold Approximation and Projection (McInnes et al. 2018).
 
@@ -544,11 +544,11 @@ class UMAP(ReduccionDimensionalidad):
 
     Parámetros clave:
         n_vecinos: balance global/local.
-                   Bajo (5–15)  → estructura local fina, clusters pequeños.
-                   Alto (30–100) → estructura global, gradientes continuos.
+                Bajo (5–15)  → estructura local fina, clusters pequeños.
+                Alto (30–100) → estructura global, gradientes continuos.
         min_dist:  compacidad de clusters.
-                   Bajo (0.0–0.1)  → clusters densos (clasificación).
-                   Alto (0.5–1.0)  → distribución continua (gradientes).
+                Bajo (0.0–0.1)  → clusters densos (clasificación).
+                Alto (0.5–1.0)  → distribución continua (gradientes).
 
     Ventajas:
         - Preserva estructura global mejor que t-SNE

@@ -9,7 +9,6 @@ from .Controlador_BioImagen import BioImagenData, ErrorBioImagen
 from ..gestorLab.Registro_Metodos import registro_metodos
 from ..gestorLab.Operacion import Operacion
 from ..gestorLab.Categoria_Operacion import CategoriaOperacion, TipoDato
-from ..gestorLab.Validacion_Operacion import tipo_salida as tipo_salida_cat
 
 TEntrada = TypeVar("TEntrada")
 TSalida  = TypeVar("TSalida")
@@ -20,9 +19,9 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
     Controlador genérico.
 
     Responsabilidades:
-      - Ejecutar un método sobre datos (hook pipeline)
-      - Producir callables con canal ya capturado  ← toda la canal-logic vive acá
-      - Crear Operaciones para el pipeline builder
+        - Ejecutar un método sobre datos (hook pipeline)
+        - Producir callables con canal ya capturado  ← toda la canal-logic vive acá
+        - Crear Operaciones para el pipeline builder
 
     NO decide qué hace el método: eso es el método.
     NO itera canales desde Operacion: eso es el controlador.
@@ -38,42 +37,30 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
     # =========================================================
 
     def _preprocesar(self, data: BioImagenData, canal: int) -> np.ndarray:
-        """Extrae y convierte el canal. Punto de extensión."""
+        """Extrae slice [T,Z,Y,X] y convierte a float64. Punto de extensión."""
         return data.datos[:, :, canal, :, :].astype(np.float64)
 
-    def _postprocesar(
-        self,
-        data: BioImagenData,
-        resultado: Any,
-        canal: int
-    ) -> Any:
+    def _postprocesar(self, data: BioImagenData, resultado: Any, canal: int) -> Any:
         """
         Reinserta resultado en BioImagenData si es np.ndarray.
         Para otros tipos (DataFrame, Figure, modelo) devuelve tal cual.
         """
         if not isinstance(resultado, np.ndarray):
-            return resultado  # DataFrame, Figure, objeto, etc. — sin tocar
-
+            return resultado
         nuevos = data.datos.copy()
         nuevos[:, :, canal, :, :] = resultado
         return replace(data, datos=nuevos)
 
     def _validar_entrada(self, data: BioImagenData, canal: int) -> None:
         if not (0 <= canal < data.dims.C):
-            raise ValueError(
-                f"Canal {canal} fuera de rango [0, {data.dims.C - 1}]"
-            )
+            raise ValueError(f"Canal {canal} fuera de rango [0, {data.dims.C - 1}]")
 
     def _validar_salida(self, resultado: Any, canal_data: np.ndarray) -> None:
-        """
-        Sólo valida forma si el resultado es un array
-        (no aplica a DataFrames, plots, etc.)
-        """
+        """Valida shape solo si el resultado es np.ndarray."""
         if isinstance(resultado, np.ndarray):
             if resultado.shape != canal_data.shape:
                 raise ValueError(
-                    f"Shape inválido: esperado {canal_data.shape}, "
-                    f"obtenido {resultado.shape}"
+                    f"Shape inválido: esperado {canal_data.shape}, obtenido {resultado.shape}"
                 )
 
     def _adaptar_metodo(self, metodo) -> Callable:
@@ -89,75 +76,73 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         return True
 
     # =========================================================
+    # INFERENCIA DE TIPOS RUNTIME (para Operacion.tipo_entrada/tipo_salida_real)
+    # =========================================================
+
+    def _inferir_tipo_entrada_real(self, categoria: CategoriaOperacion) -> type:
+        import pandas as pd
+        mapping = {
+            CategoriaOperacion.PREPROCESAMIENTO: BioImagenData,
+            CategoriaOperacion.FILTRACION:       BioImagenData,
+            CategoriaOperacion.REALZADOR:        BioImagenData,
+            CategoriaOperacion.TRANSFORMADOR:    BioImagenData,
+            CategoriaOperacion.SEGMENTADOR:      BioImagenData,
+            CategoriaOperacion.CUANTIFICADOR:    BioImagenData,
+            CategoriaOperacion.MODELADOR:        pd.DataFrame,
+            CategoriaOperacion.ANALIZADOR:       object,
+        }
+        return mapping.get(categoria, object)
+
+    def _inferir_tipo_salida_real(self, categoria: CategoriaOperacion) -> type:
+        import pandas as pd
+        mapping = {
+            CategoriaOperacion.PREPROCESAMIENTO: BioImagenData,
+            CategoriaOperacion.FILTRACION:       BioImagenData,
+            CategoriaOperacion.REALZADOR:        BioImagenData,
+            CategoriaOperacion.TRANSFORMADOR:    BioImagenData,
+            CategoriaOperacion.SEGMENTADOR:      BioImagenData,
+            CategoriaOperacion.CUANTIFICADOR:    pd.DataFrame,
+            CategoriaOperacion.MODELADOR:        pd.DataFrame,
+            CategoriaOperacion.ANALIZADOR:       object,
+        }
+        return mapping.get(categoria, object)
+
+    # =========================================================
     # CORE INTERNO
     # =========================================================
 
-    def _inferir_tipo_salida_real(self, categoria: CategoriaOperacion):
-        mapping = {
-            CategoriaOperacion.PREPROCESAMIENTO: BioImagenData,
-            CategoriaOperacion.FILTRACION: BioImagenData,
-            CategoriaOperacion.REALZADOR: BioImagenData,
-            CategoriaOperacion.TRANSFORMADOR: BioImagenData,
-            CategoriaOperacion.SEGMENTADOR: BioImagenData,  # o np.ndarray si separás máscara
-            CategoriaOperacion.CUANTIFICADOR: object,  # DataFrame
-            CategoriaOperacion.MODELADOR: object,
-            CategoriaOperacion.ANALIZADOR: object,
-        }
-        return mapping.get(categoria, object)
-
-    def _inferir_tipo_entrada_real(self, categoria: CategoriaOperacion):
-        mapping = {
-            CategoriaOperacion.PREPROCESAMIENTO: BioImagenData,
-            CategoriaOperacion.FILTRACION: BioImagenData,
-            CategoriaOperacion.REALZADOR: BioImagenData,
-            CategoriaOperacion.TRANSFORMADOR: BioImagenData,
-            CategoriaOperacion.SEGMENTADOR: BioImagenData,  # o np.ndarray si separás máscara
-            CategoriaOperacion.CUANTIFICADOR: BioImagenData,  # DataFrame
-            CategoriaOperacion.MODELADOR: object,
-            CategoriaOperacion.ANALIZADOR: object,
-        }
-        return mapping.get(categoria, object)
-
     def _ejecutar(
-        self,
-        data: BioImagenData,
-        metodo,
-        tipo_aplicacion=None,
-        canal: int = 0
-    ) -> Resultado[TSalida, ErrorBioImagen]:
-        """
-        Ejecuta metodo sobre un único canal.
-        Todos los hooks se invocan aquí.
-        """
-        nombre = getattr(metodo, "nombre", metodo.__class__.__name__)
-        try:
-            self._validar_entrada(data, canal)
+            self,
+            data: BioImagenData,
+            metodo,
+            tipo_aplicacion=None,
+            canal: int = 0
+        ) -> Resultado[TSalida, ErrorBioImagen]:
+            nombre = getattr(metodo, "nombre", metodo.__class__.__name__)
+            try:
+                self._validar_entrada(data, canal)
+                canal_data      = self._preprocesar(data, canal)
+                metodo_adaptado = self._adaptar_metodo(metodo)
+                estrategia      = (
+                    self._obtener_estrategia(tipo_aplicacion)
+                    if self._requiere_estrategia() else None
+                )
+                resultado = (
+                    estrategia(canal_data, metodo_adaptado)
+                    if estrategia is not None
+                    else metodo_adaptado(canal_data)
+                )
+                self._validar_salida(resultado, canal_data)
+                salida = self._postprocesar(data, resultado, canal)
+                return Ok(salida)
 
-            canal_data      = self._preprocesar(data, canal)
-            metodo_adaptado = self._adaptar_metodo(metodo)
-            estrategia      = (
-                self._obtener_estrategia(tipo_aplicacion)
-                if self._requiere_estrategia() else None
-            )
-
-            resultado = (
-                estrategia(canal_data, metodo_adaptado)
-                if estrategia is not None
-                else metodo_adaptado(canal_data)
-            )
-
-            self._validar_salida(resultado, canal_data)
-            salida = self._postprocesar(data, resultado, canal)
-
-            return Ok(salida)
-
-        except Exception as e:
-            return Err(ErrorBioImagen(
-                etapa=self._etapa,
-                mensaje=f"Error en '{nombre}': {e}",
-                ruta=data.ruta_origen,
-                causa=e
-            ))
+            except Exception as e:
+                return Err(ErrorBioImagen(
+                    etapa=self._etapa,
+                    mensaje=f"Error en '{nombre}': {e}",
+                    ruta=data.ruta_origen,
+                    causa=e
+                ))
 
     # =========================================================
     # FACTORIES DE CALLABLE  ← canal capturado en el cierre
@@ -169,11 +154,7 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         tipo_aplicacion=None,
         canal: int = 0
     ) -> Callable[[BioImagenData], Resultado[TSalida, ErrorBioImagen]]:
-        """
-        Devuelve un callable (BioImagenData) → Resultado.
-        El canal queda capturado en el cierre.
-        Operacion.ejecutar sólo llama a este callable — sin saber nada de canales.
-        """
+        """Canal capturado en el cierre — Operacion recibe un callable de 1 argumento."""
         self._ultimo_metodo = metodo
 
         def _op(data: BioImagenData) -> Resultado[TSalida, ErrorBioImagen]:
@@ -186,11 +167,7 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         metodo,
         tipo_aplicacion=None
     ) -> Callable[[BioImagenData], Resultado[BioImagenData, ErrorBioImagen]]:
-        """
-        Aplica el método sobre TODOS los canales secuencialmente.
-        Sólo tiene sentido para IMAGEN → IMAGEN (el _postprocesar reinserta).
-        Para otros TipoDato usar crear_operador con canal explícito.
-        """
+        """Aplica método sobre todos los canales secuencialmente."""
         self._ultimo_metodo = metodo
 
         def _multi(data: BioImagenData) -> Resultado[BioImagenData, ErrorBioImagen]:
@@ -214,40 +191,34 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         nombre_metodo: str,
         categoria: CategoriaOperacion,
         tipo_aplicacion=None,
-        canal: Optional[int] = None,        # None = multicanal
+        canal: Optional[int] = None,
         nombre: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
-        tipo_salida: TipoDato = TipoDato.IMAGEN,
+        tipo_salida: TipoDato = TipoDato.IMAGEN,   # ← este param se usa directamente abajo
     ) -> Operacion:
-        """
-        Construye una Operacion lista para el pipeline builder.
-        El callable ya lleva canal capturado — Operacion no sabe de canales.
-        """
+        """Construye una Operacion lista para el pipeline builder."""
         clase  = registro_metodos.obtener(self._dominio, nombre_metodo)
         metodo = clase(**(params or {}))
 
-        if canal is not None:
-            callable_ = self.crear_operador(metodo, tipo_aplicacion, canal)
-        else:
-            callable_ = self.crear_operador_multicanal(metodo, tipo_aplicacion)
-
-        return Operacion(
-            nombre               = nombre or f"{self._etapa}_{nombre_metodo}",
-            categoria            = categoria,
-            instancia_callable   = callable_,
-            
-            # NUEVO CONTRATO DE TIPOS (DEFAULT)
-            tipo_entrada         = self._inferir_tipo_entrada_real(categoria), 
-            tipo_salida_real = self._inferir_tipo_salida_real(categoria),  # default imagen → imagen
-            
-            canal_objetivo       = canal,
-            parametros_originales= params or {},
-
-            # ahora alineado con sistema semántico
-            tipo_salida          = tipo_salida_cat(categoria),
+        callable_ = (
+            self.crear_operador(metodo, tipo_aplicacion, canal)
+            if canal is not None
+            else self.crear_operador_multicanal(metodo, tipo_aplicacion)
         )
 
-    # YAML / dinámico (sin crear Operacion, sólo el callable)
+        return Operacion(
+            nombre                = nombre or f"{self._etapa}_{nombre_metodo}",
+            categoria             = categoria,
+            instancia_callable    = callable_,
+            tipo_entrada          = self._inferir_tipo_entrada_real(categoria),
+            tipo_salida_real      = self._inferir_tipo_salida_real(categoria),
+            canal_objetivo        = canal,
+            parametros_originales = params or {},
+            # CORREGIDO: usar el param 'tipo_salida' directamente, no tipo_salida_cat(categoria)
+            # Eso ignoraba MASCARA, TABLA, etc. pasados por subclases
+            tipo_dato_salida      = tipo_salida,
+        )
+
     def crear(
         self,
         nombre_metodo: str,
@@ -255,6 +226,7 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
         canal: int = 0,
         **params
     ) -> Callable[[BioImagenData], Resultado[TSalida, ErrorBioImagen]]:
+        """Resolución dinámica desde YAML — devuelve solo el callable."""
         clase  = registro_metodos.obtener(self._dominio, nombre_metodo)
         metodo = clase(**params)
         return self.crear_operador(metodo, tipo_aplicacion, canal)
@@ -266,7 +238,4 @@ class Controlador_Base(Generic[TEntrada, TSalida]):
 
     def __repr__(self):
         ultimo = getattr(self._ultimo_metodo, "nombre", "Ninguno")
-        return (
-            f"<{self.__class__.__name__} "
-            f"dominio={self._dominio} ultimo={ultimo}>"
-        )
+        return f"<{self.__class__.__name__} dominio={self._dominio} ultimo={ultimo}>"

@@ -29,18 +29,15 @@ class Dimensiones:
 
 @dataclass(frozen=True)
 class BioImagenData:
-    """
-        Estructura unificada para cualquier tipo de imagen (estándar o bioimagen)
-    """
-    datos: np.ndarray  # Shape [T, Z, C, Y, X]
-    dims: Dimensiones
-    canales: Tuple[str, ...]
+    """Estructura unificada para cualquier tipo de imagen (estándar o bioimagen)."""
+    datos:       np.ndarray        # Shape [T, Z, C, Y, X]
+    dims:        Dimensiones
+    canales:     Tuple[str, ...]
     ruta_origen: Path
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    es_bioformato: bool = False  # para saber el origen
-    
+    metadata:    Dict[str, Any] = field(default_factory=dict)
+    es_bioformato: bool = False
+
     def __post_init__(self):
-        # Validación inmutable: verificar consistencia
         assert self.datos.shape == self.dims.shape, \
             f"Shape {self.datos.shape} no coincide con dims {self.dims.shape}"
         assert len(self.canales) == self.dims.C, \
@@ -48,15 +45,13 @@ class BioImagenData:
 
 @dataclass(frozen=True)
 class ErrorBioImagen:
-    etapa: str  # "lectura", "procesamiento", "indexacion"
+    etapa:   str
     mensaje: str
-    ruta: Optional[Path] = None
-    causa: Optional[Exception] = None
-    
+    metodo:  str            = ""   # ← tenía default faltante — rompía toda llamada sin él
+    ruta:    Optional[Path] = None
+    causa:   Optional[Exception] = None
+
     def con_contexto(self, nueva_etapa: str) -> ErrorBioImagen:
-        """
-            Añade contexto al pipeline de error
-        """
         return replace(self, etapa=f"{nueva_etapa} -> {self.etapa}")
 
 @dataclass(frozen=True)
@@ -79,7 +74,7 @@ def leer_bioformato(ruta: Path) -> Resultado[BioImage, ErrorBioImagen]:
     """
     try:
         img = BioImage(ruta, reader=bioio_bioformats.Reader)
-        return Ok(img)
+        return Ok((img, ruta))
     except FileNotFoundError as e:
         return Err(ErrorBioImagen(
             etapa="lectura",
@@ -122,7 +117,8 @@ def leer_estandar(ruta: Path) -> Resultado[np.ndarray, ErrorBioImagen]:
 
 def procesar_bioformato(
     bioimg: BioImage, 
-    modo: ModoImagen
+    modo: ModoImagen,
+    ruta: Path
 ) -> Resultado[BioImagenData, ErrorBioImagen]:
     """
         Procesa BioImage a estructura unificada.
@@ -139,40 +135,30 @@ def procesar_bioformato(
     """
     try:
         img_data = bioimg.get_image_data("TZCYX")
-        channel_names = tuple(bioimg.channel_names)
-        
+        channel_names = tuple(bioimg.channel_names or [])
+
         match modo:
             case ModoImagen.AUTO:
-                datos = img_data
-                canales = channel_names
-                
+                datos, canales = img_data, channel_names
             case ModoImagen.RGB:
                 if img_data.shape[2] != 3:
                     return Err(ErrorBioImagen(
-                        etapa="procesamiento",
-                        mensaje=f"Modo RGB requiere 3 canales, tiene {img_data.shape[2]}"
+                        etapa="preprocesamiento",
+                        mensaje=f"RGB requiere 3 canales, tiene {img_data.shape[2]}"
                     ))
-                datos = img_data
-                canales = ("Rojo", "Verde", "Azul")
-                
+                datos, canales = img_data, ("Rojo", "Verde", "Azul")
             case ModoImagen.GRIS:
                 datos = np.mean(img_data, axis=2, keepdims=True)
                 canales = ("Gris",)
-        
+
         T, Z, C, Y, X = datos.shape
         return Ok(BioImagenData(
-            datos=datos,
-            dims=Dimensiones(T, Z, C, Y, X),
-            canales=canales,
-            ruta_origen=Path(bioimg.path),
-            es_bioformato=True
+            datos=datos, dims=Dimensiones(T, Z, C, Y, X),
+            canales=canales, ruta_origen=ruta, es_bioformato=True
         ))
-        
     except Exception as e:
         return Err(ErrorBioImagen(
-            etapa="procesamiento",
-            mensaje=f"Error procesando bioformato: {str(e)}",
-            causa=e
+            etapa="preprocesamiento", mensaje=f"Error procesando bioformato: {e}", causa=e
         ))
 
 def procesar_estandar(
@@ -198,45 +184,37 @@ def procesar_estandar(
         match modo:
             case ModoImagen.AUTO:
                 if img_raw.ndim == 3 and img_raw.shape[2] == 3:
-                    # RGB: separar canales y crear dims 5D
-                    canales_rgb = [img_raw[:, :, i] for i in range(3)]
-                    datos = np.stack(canales_rgb, axis=0)[np.newaxis, np.newaxis, :, :, :]
+                    datos = np.stack(
+                        [img_raw[:, :, i] for i in range(3)], axis=0
+                    )[np.newaxis, np.newaxis, :, :, :]
                     canales = ("Rojo", "Verde", "Azul")
                 else:
-                    # Grayscale: añadir dims
-                    datos = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
+                    datos   = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
                     canales = ("Gris",)
-                    
             case ModoImagen.RGB:
                 if not (img_raw.ndim == 3 and img_raw.shape[2] == 3):
                     return Err(ErrorBioImagen(
                         etapa="procesamiento",
-                        mensaje="Modo RGB requiere imagen color (3 canales)"
+                        mensaje="RGB requiere imagen color (3 canales)"
                     ))
-                canales_rgb = [img_raw[:, :, i] for i in range(3)]
-                datos = np.stack(canales_rgb, axis=0)[np.newaxis, np.newaxis, :, :, :]
+                datos = np.stack(
+                    [img_raw[:, :, i] for i in range(3)], axis=0
+                )[np.newaxis, np.newaxis, :, :, :]
                 canales = ("Rojo", "Verde", "Azul")
-                
             case ModoImagen.GRIS:
                 if img_raw.ndim == 3 and img_raw.shape[2] == 3:
                     img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2GRAY)
-                datos = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
+                datos   = img_raw[np.newaxis, np.newaxis, np.newaxis, :, :]
                 canales = ("Gris",)
-        
+
         T, Z, C, Y, X = datos.shape
         return Ok(BioImagenData(
-            datos=datos,
-            dims=Dimensiones(T, Z, C, Y, X),
-            canales=canales,
-            ruta_origen=ruta,
-            es_bioformato=False
+            datos=datos, dims=Dimensiones(T, Z, C, Y, X),
+            canales=canales, ruta_origen=ruta
         ))
-        
     except Exception as e:
         return Err(ErrorBioImagen(
-            etapa="procesamiento",
-            mensaje=f"Error procesando imagen estándar: {str(e)}",
-            causa=e
+            etapa="procesamiento", mensaje=f"Error procesando imagen: {e}", causa=e
         ))
 
 
@@ -255,17 +233,12 @@ def cargar_imagen(ruta: Path, modo: ModoImagen = ModoImagen.AUTO) -> Resultado[B
             O(1)
     """
     if clasificar_extension(ruta):
-        # Mini-Pipeline bioformato: leer -> procesar
-        return (
-            leer_bioformato(ruta)
-            .bind(lambda bioimg: procesar_bioformato(bioimg, modo))
+        return leer_bioformato(ruta).bind(
+            lambda t: procesar_bioformato(t[0], modo, t[1])
         )
-    else:
-        # Mini-Pipeline estándar: leer -> procesar
-        return (
-            leer_estandar(ruta)
-            .bind(lambda img_raw: procesar_estandar(img_raw, modo, ruta))
-        )
+    return leer_estandar(ruta).bind(
+        lambda arr: procesar_estandar(arr, modo, ruta)
+    )
 
 # Funciones de transformación y de soporte
 
@@ -331,12 +304,12 @@ def aplicar_a_corte(
             corte_procesado = operacion(corte)
             if corte_procesado.shape != corte.shape:
                 return Err(ErrorBioImagen(
-                    etapa="procesamiento",
+                    etapa="preprocesamiento",
                     mensaje=f"La operación alteró las dimensiones Y,X: {corte.shape} -> {corte_procesado.shape}"
                 ))
         except Exception as e:
             return Err(ErrorBioImagen(
-                etapa="procesamiento",
+                etapa="preprocesamiento",
                 mensaje=f"Error en operación: {str(e)}",
                 causa=e
             ))
@@ -413,31 +386,33 @@ class ControladorBioImagen:
     """
 
     def __init__(self, ruta_imagen: str | Path):
-        self.ruta_imagen = Path(ruta_imagen)
-        self._data: Optional[BioImagenData] = None
-        self._procesada: Optional[BioImagenData] = None # La imagen procesada
+        self.ruta_imagen   = Path(ruta_imagen)
+        self._data:         Optional[BioImagenData]  = None
+        self._procesada:    Optional[BioImagenData]  = None
         self._ultimo_error: Optional[ErrorBioImagen] = None
 
-        # Errores
-        self._ultimo_error: Optional[ErrorBioImagen] = None
+    def cargar_ImagenResultado(
+        self, modo: ModoImagen = ModoImagen.AUTO
+    ) -> Resultado[BioImagenData, ErrorBioImagen]:
+        resultado = cargar_imagen(self.ruta_imagen, modo)
+        if resultado.es_ok():
+            self._data          = resultado.unwrap()
+            self._procesada     = None
+            self._ultimo_error  = None
+        else:
+            self._ultimo_error = resultado.error
+        return resultado
 
-    def __bool__(self) -> bool:
-        return self._data is not None
+    def cargar(self, modo: ModoImagen = ModoImagen.AUTO) -> bool:
+        return self.cargar_ImagenResultado(modo).es_ok()
 
     @property
     def forma(self) -> Tuple[int, ...]:
-        """
-            Retorna la forma 5D (T, Z, C, Y, X).
-        """
         return self._data.dims.shape if self._data else (0, 0, 0, 0, 0)
-    
+
     @property
     def canales(self) -> Tuple[str, ...]:
-        """
-            Retorna los nombres de los canales cromáticos.
-        """
-        return self._data.channel_names if self._data else ()
-
+        return self._data.canales if self._data else ()
 
     def cargar_ImagenResultado(self, modo: ModoImagen = ModoImagen.AUTO) -> Resultado[BioImagenData, ErrorBioImagen]:
         """
@@ -539,33 +514,16 @@ class ControladorBioImagen:
             self.forma == other.forma
         )
 
-
-    def __len__(self) -> int:
-        """
-            Metodo para determinar la cantidad de fotos totales existentes.
-            Retorna : Int
-            Complejida : O(1)
-        """
-
-        if self._data is None: return 0
-        return self._data.dims.T * self._data.dims.Z
-
-    # Metodos para I/O : Abrir imagenes, liberar memoria y cachear los bioformatos.
-    def __enter__(self):
-        self.cargar()
+    def __bool__(self):   
+        return self._data is not None
+    def __len__(self):    
+        return (self._data.dims.T * self._data.dims.Z) if self._data else 0
+    def __enter__(self):  
+        self.cargar(); 
         return self
+    def __exit__(self, *_): self._data = self._procesada = None
 
-    def __exit__(self, exc_type, exc_val, exc_tb): 
-        # O(1)
-        self._data = None
-        self._procesada = None
-
-    def __repr__(self) -> str:
-        """
-            Metodo para debugging.
-            Retorna : F-String
-            Complejidad : O(1)
-        """
+    def __repr__(self):
         if self._data is None:
-            return f"<ControladorBioImagen ruta='{self.ruta_imagen.name}' (no cargada)>"
-        return f"<ControladorBioImagen ruta='{self.ruta_imagen.name}' forma={self.forma} canales={self.canales}>"
+            return f"<ControladorBioImagen '{self.ruta_imagen.name}' (no cargada)>"
+        return f"<ControladorBioImagen '{self.ruta_imagen.name}' forma={self.forma}>"

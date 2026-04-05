@@ -37,6 +37,7 @@ import pandas as pd
 from sklearn import metrics
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.neighbors import NearestNeighbors
+from ...gestorLab.Registro_Metodos import registrar_en
 
 # Intentar importar HDBSCAN (opcional, requiere instalación)
 try:

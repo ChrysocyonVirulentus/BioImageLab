@@ -32,7 +32,7 @@ import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from Estetica import EsteticaGrafico, ESTILOS_PREDEFINIDOS
+from .Estetica import EsteticaGrafico, ESTILOS_PREDEFINIDOS
 
 _EST_DEFAULT = EsteticaGrafico()
 
@@ -550,20 +550,20 @@ def pairplot(
 
     if tipo_offdiagonal == 'reg':
         g = sns.pairplot(**{k: v for k, v in kwargs_pp.items() if k != 'plot_kws'},
-                         kind='reg',
-                         plot_kws={'scatter_kws': {'alpha': est.alpha_puntos,
+                        kind='reg',
+                        plot_kws={'scatter_kws': {'alpha': est.alpha_puntos,
                                                     's': est.tamaño_punto // 3}})
     elif tipo_offdiagonal == 'kde':
         g = sns.pairplot(**{k: v for k, v in kwargs_pp.items() if k != 'plot_kws'},
-                         kind='kde',
-                         plot_kws={'alpha': est.alpha_relleno + 0.1})
+                        kind='kde',
+                        plot_kws={'alpha': est.alpha_relleno + 0.1})
     else:
         g = sns.pairplot(**kwargs_pp)
 
     g.figure.suptitle(titulo, y=1.01,
-                       fontsize=est.fuente_titulo + 2,
-                       fontweight='bold' if est.negrita_titulo else 'normal',
-                       fontfamily=est.fuente_familia)
+                    fontsize=est.fuente_titulo + 2,
+                    fontweight='bold' if est.negrita_titulo else 'normal',
+                    fontfamily=est.fuente_familia)
     plt.tight_layout()
     if mostrar:
         plt.show()
