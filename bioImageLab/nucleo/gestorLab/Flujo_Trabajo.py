@@ -20,9 +20,12 @@ class NodoPipeline:
     id:        str
     tipo_dato: TipoDato
     data:      List[Any] = field(default_factory=list)
+    hay_fusion:  bool                              = False
+    fusion_fn:  Optional[Callable[[List[Any]], Any]] = None   # combina lista de inputs
 
     def __repr__(self):
-        return f"<Nodo {self.id} ({self.tipo_dato.name})>"
+        marca = " [FUSION]" if self.hay_fusion else ""
+        return f"<Nodo {self.id}{marca} ({self.tipo_dato.name})>"
 
 
 # =========================================================
@@ -54,14 +57,14 @@ class GrafoPipeline:
     def agregar_arista(self, arista: AristaOperacion):
         if arista.origen not in self.nodos or arista.destino not in self.nodos:
             raise ValueError(
-                f"Nodo origen '{arista.origen}' o destino '{arista.destino}' no existe"
+                f"Nodo '{arista.origen}' o '{arista.destino}' no existe"
             )
         self.aristas.append(arista)
 
-    def salientes(self, nodo_id: str)  -> List[AristaOperacion]:
+    def salientes(self, nodo_id: str) -> List[AristaOperacion]:
         return [a for a in self.aristas if a.origen  == nodo_id]
 
-    def entrantes(self, nodo_id: str)  -> List[AristaOperacion]:
+    def entrantes(self, nodo_id: str) -> List[AristaOperacion]:
         return [a for a in self.aristas if a.destino == nodo_id]
 
     def nodos_iniciales(self) -> List[NodoPipeline]:
@@ -70,7 +73,14 @@ class GrafoPipeline:
     def nodos_finales(self) -> List[NodoPipeline]:
         return [n for n in self.nodos.values() if not self.salientes(n.id)]
 
+    
+
+    # -----------------------------
+    # Orden topológico (DAG)
+    # -----------------------------
+
     def orden_topologico(self) -> List[str]:
+        """Algoritmo de Kahn — único, sin duplicados."""
         in_degree = {n: 0 for n in self.nodos}
         for a in self.aristas:
             in_degree[a.destino] += 1
@@ -85,36 +95,6 @@ class GrafoPipeline:
                     cola.append(arista.destino)
         if len(orden) != len(self.nodos):
             raise ValueError("El grafo tiene ciclos — no es un DAG válido")
-        return orden
-
-    # -----------------------------
-    # Orden topológico (DAG)
-    # -----------------------------
-
-    def orden_topologico(self) -> List[str]:
-        """
-        Kahn's Algorithm
-        """
-        in_degree = {n: 0 for n in self.nodos}
-
-        for a in self.aristas:
-            in_degree[a.destino] += 1
-
-        cola = [n for n, deg in in_degree.items() if deg == 0]
-        orden = []
-
-        while cola:
-            actual = cola.pop(0)
-            orden.append(actual)
-
-            for arista in self.salientes(actual):
-                in_degree[arista.destino] -= 1
-                if in_degree[arista.destino] == 0:
-                    cola.append(arista.destino)
-
-        if len(orden) != len(self.nodos):
-            raise ValueError("El grafo tiene ciclos")
-
         return orden
 
 
@@ -142,10 +122,7 @@ class FlujoTrabajo:
     def ejecutar(
         self, input_inicial: Any
     ) -> Resultado[Tuple[Dict[str, Any], List[LogEvento]], Any]:
-        """
-        Retorna Ok((salida_dict, lista_logs)) o Err(error_enriquecido).
-        Los logs de cada operación se cosechan de las cajas intermedias.
-        """
+
         try:
             orden = self.grafo.orden_topologico()
         except Exception as e:
@@ -160,11 +137,39 @@ class FlujoTrabajo:
         for nodo in iniciales:
             nodo.data = [input_inicial]
 
-        # Logs acumulados de todas las operaciones
         logs_acumulados: List[LogEvento] = []
 
         for nodo_id in orden:
             nodo = self.grafo.nodos[nodo_id]
+
+            # ── FUSION: combinar cuando todos los inputs están listos ─────
+            if nodo.hay_fusion and nodo.fusion_fn is not None:
+                n_esperados = len(self.grafo.entrantes(nodo_id))
+                if len(nodo.data) < n_esperados:
+                    # No deberías llegar aquí en un DAG correcto con Kahn
+                    return Err(ErrorBioImagen(
+                        etapa="fusion",
+                        mensaje=(
+                            f"Fusion '{nodo_id}' esperaba {n_esperados} inputs, "
+                            f"recibió {len(nodo.data)}"
+                        )
+                    ))
+                try:
+                    combinado = nodo.fusion_fn(nodo.data)
+                    nodo.data = [combinado]
+                    logs_acumulados.append(LogEvento(
+                        etapa   = "fusion",
+                        mensaje = f"Fusion '{nodo_id}' OK ({n_esperados} inputs combinados)",
+                        nivel   = NivelLog.INFO,
+                        metadata= {"nodo": nodo_id, "n_inputs": n_esperados},
+                    ))
+                except Exception as e:
+                    return Err(ErrorBioImagen(
+                        etapa="fusion",
+                        mensaje=f"Error en fusion '{nodo_id}': {e}",
+                        causa=e,
+                    ))
+
             if not nodo.data:
                 continue
 
@@ -173,24 +178,23 @@ class FlujoTrabajo:
             for arista in self.grafo.salientes(nodo_id):
                 resultado = arista.operacion.ejecutar(input_data)
 
-                # Cosechar logs antes de abrir la caja
-                log_intermedio = getattr(resultado, "_log", ())
+                # Cosechar logs de la caja
+                log_caja = getattr(resultado, "_log", ())
                 logs_acumulados.extend(
-                    ev for ev in log_intermedio if isinstance(ev, LogEvento)
+                    ev for ev in log_caja if isinstance(ev, LogEvento)
                 )
 
                 if resultado.es_err():
                     error = resultado.error
-                    # Agregar log del error antes de propagar
                     logs_acumulados.append(LogEvento(
-                        etapa   = f"pipeline -> {getattr(error, 'etapa', 'desconocido')}",
+                        etapa   = f"pipeline -> {getattr(error, 'etapa', '?')}",
                         mensaje = (
                             f"[{nodo_id} → {arista.destino}] "
                             f"'{arista.operacion.nombre}' falló: "
                             f"{getattr(error, 'mensaje', str(error))}"
                         ),
-                        nivel    = NivelLog.ERROR,
-                        metadata = {"nodo_origen": nodo_id, "nodo_destino": arista.destino},
+                        nivel   = NivelLog.ERROR,
+                        metadata= {"nodo_origen": nodo_id, "nodo_destino": arista.destino},
                     ))
                     try:
                         error_enriquecido = replace(
@@ -199,20 +203,17 @@ class FlujoTrabajo:
                             mensaje = (
                                 f"[{nodo_id} → {arista.destino}] "
                                 f"'{arista.operacion.nombre}' falló: {error.mensaje}"
-                            )
+                            ),
                         )
                     except Exception:
                         error_enriquecido = error
-
-                    # Retornar Err con los logs acumulados hasta el fallo
                     return Err(error_enriquecido, tuple(logs_acumulados))
 
-                # Log de éxito por operación
                 logs_acumulados.append(LogEvento(
                     etapa   = arista.operacion.categoria.name.lower(),
                     mensaje = f"'{arista.operacion.nombre}' OK",
                     nivel   = NivelLog.INFO,
-                    metadata = {"nodo": nodo_id, "destino": arista.destino},
+                    metadata= {"nodo": nodo_id, "destino": arista.destino},
                 ))
 
                 self.grafo.nodos[arista.destino].data.append(resultado.unwrap())
@@ -221,7 +222,6 @@ class FlujoTrabajo:
             n.id: n.data[-1] if n.data else None
             for n in self.grafo.nodos_finales()
         }
-
         return Ok((salida, logs_acumulados))
 
     # =========================================================
@@ -264,6 +264,8 @@ class FlujoTrabajo:
             nodo_destino = self.grafo.nodos[arista.destino]
             op           = arista.operacion
             if op.tipo_dato_salida is None: continue
+            # Fusion nodes receive MASCARA + IMAGEN — skip strict check
+            if nodo_destino.hay_fusion: continue
             if nodo_destino.tipo_dato != op.tipo_dato_salida:
                 errores.append(
                     f"TipoDato inconsistente: nodo={nodo_destino.tipo_dato.name} "

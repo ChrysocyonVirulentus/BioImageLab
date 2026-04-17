@@ -17,14 +17,20 @@ etapas:
         params:
           radio: 5
 
-  - preprocesamiento:
-      - metodo: to_uint8
-        dominio: normalizacion
-        canal: 0
-        tipo_aplicacion: global
+  -split_1 (segmentacion) :
+    - preprocesamiento:
+        - metodo: to_uint8
+          dominio: normalizacion
+          canal: 0
+          tipo_aplicacion: global
 
-  - segmentacion:
-      - metodo: otsu
-        dominio: segmentacion
-        canal: 0
-        tipo_aplicacion: por_corte_espaciotemporal
+    - segmentacion:
+        - metodo: otsu
+          dominio: segmentacion
+          canal: 0
+          tipo_aplicacion: por_corte_espaciotemporal
+  
+  -merge (split_1, filtracion):
+
+  -cuantificacion:
+    -metodo: MediaIntensidad
