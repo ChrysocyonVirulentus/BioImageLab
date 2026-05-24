@@ -1,3 +1,5 @@
+# === gestorLab/Validar_Flujo_Trabajo.py ===
+
 from __future__ import annotations
 
 from typing import Set, List
@@ -8,7 +10,6 @@ from ..controlador.Controlador_BioImagen import ErrorBioImagen
 from .Flujo_Trabajo import GrafoPipeline
 from .Categoria_Operacion import CategoriaOperacion
 
-# CORREGIDO: nombre correcto del módulo
 from .Validacion_Operacion import (
     es_compatible,
     requiere_adaptador,
@@ -27,12 +28,9 @@ def validar_pipeline(
     Retorna:
       Ok(lista_de_warnings)  → pipeline válido, warnings acumulados en el valor
       Err(ErrorBioImagen)    → pipeline inválido, errores duros
-
-    El llamador (GestorLab) puede inyectar los warnings al log
-    del Resultado de ejecución si lo desea.
     """
-    errores_duros: List[str]  = []
-    warnings:      List[str]  = []
+    errores_duros: List[str] = []
+    warnings:      List[str] = []
 
     # ── 1. DAG sin ciclos ────────────────────────────────────
     try:
@@ -51,7 +49,6 @@ def validar_pipeline(
 
         entrantes = grafo.entrantes(arista.origen)
 
-        # Categorías que ya están presentes antes de esta operación
         categorias_previas: Set[CategoriaOperacion] = {
             a.operacion.categoria for a in entrantes
         }
@@ -94,12 +91,12 @@ def validar_pipeline(
             causa=ValueError(detalle),
         ))
 
-    # Warnings como LogEventos — el llamador los gestiona
+    # FIX: usar NivelLog.WARN para warnings, no NivelLog.ERROR
     log_warnings = [
         LogEvento(
-            etapa="validacion_pipeline",
-            mensaje=w,
-            nivel=NivelLog.ERROR,   # NivelLog.WARNING cuando lo agregues al enum
+            etapa   = "validacion_pipeline",
+            mensaje = w,
+            nivel   = NivelLog.WARN,
         )
         for w in warnings
     ]

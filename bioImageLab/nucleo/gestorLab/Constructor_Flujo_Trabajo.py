@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
+from dataclasses import replace
+from typing import Dict, Any, Optional, List, Callable
 
 from .Flujo_Trabajo import FlujoTrabajo, GrafoPipeline, NodoPipeline, AristaOperacion
 from .Categoria_Operacion import CategoriaOperacion, TipoDato
-from .Validacion_Operacion import es_compatible, obtener_adaptador, tipo_salida as tipo_salida_default
+from .Validacion_Operacion import es_compatible, obtener_adaptador
+from .Operacion import Operacion
 from .Registro_Controladores import CONTROLADORES
 
-# Importar estrategias para el mapeo
+# FIX: importar Ok para la operación identidad
+from ..controlador.Resultado_Either import Ok
+
+from ..controlador.Controlador_BioImagen import BioImagenData
+
 from ..controlador.Estrategias_Aplicacion import (
     Global,
     PorCorteZ,
@@ -34,7 +40,8 @@ def _op_identidad(nombre: str, categoria: CategoriaOperacion, tipo_dato: TipoDat
         tipo_dato_salida   = tipo_dato,
     )
 
-# ── Merge combiners ─────────────────────────────────────────────
+
+# ── Merge combiners ──────────────────────────────────────────────
 
 def _combinar_imagen_mascara(datos: List[Any]) -> BioImagenData:
     """
@@ -48,7 +55,7 @@ def _combinar_imagen_mascara(datos: List[Any]) -> BioImagenData:
         imagen,
         metadata={
             **imagen.metadata,
-            "mascara_datos": mascara.datos,     # shape [T, Z, C, Y, X] uint16
+            "mascara_datos": mascara.datos,
             "mascara_dims":  mascara.dims,
         }
     )
@@ -59,26 +66,27 @@ def _combinar_concatenar(datos: List[Any]) -> Any:
     return datos
 
 
-_FUSION_FNS: Dict[str, Callable] = {
+# FIX: nombre unificado — _procesar_merge lo referencia como _MERGE_FNS
+_MERGE_FNS: Dict[str, Callable] = {
     "imagen_mascara": _combinar_imagen_mascara,
     "concatenar":     _combinar_concatenar,
 }
 
-class ConstructorFlujoTrabajo:
 
+class ConstructorFlujoTrabajo:
     """
     Construye FlujoTrabajo desde un dict de configuración (YAML/JSON).
 
     Soporta:
-      - Etapas lineales
-      - anchor: en cualquier operación → guarda el nodo como checkpoint
-      - dividir o split: bifurcación paralela que arranca desde un checkpoint
-      - fusion o merge: combina dos ramas en una sola BioImagenData
+        - Etapas lineales
+        - anchor: en cualquier operación → guarda el nodo como checkpoint
+        - split: bifurcación paralela que arranca desde un checkpoint
+        - merge: combina dos ramas en una sola BioImagenData
     """
 
     def __init__(self):
-        self.grafo       = GrafoPipeline()
-        self._checkpoints: Dict[str, str] = {}   # nombre → nodo_id
+        self.grafo         = GrafoPipeline()
+        self._checkpoints: Dict[str, str] = {}
 
     # =========================================================
     # API PRINCIPAL
@@ -109,20 +117,18 @@ class ConstructorFlujoTrabajo:
         for nombre_bloque, contenido in etapa_cfg.items():
 
             if nombre_bloque == "split":
-                # Split no cambia nodo_actual de la rama principal
                 self._procesar_split(contenido, nodo_entrada)
+                # split no avanza nodo_entrada de la rama principal
 
             elif nombre_bloque == "merge":
                 nodo_entrada = self._procesar_merge(contenido)
 
             else:
-                # Etapa normal: lista de operaciones
                 categoria = self._mapear_categoria(nombre_bloque)
                 for op_cfg in contenido:
                     nodo_entrada = self._crear_y_conectar_operacion(
                         op_cfg, categoria, nodo_entrada
                     )
-                # Auto-checkpoint por nombre de etapa (último nodo del bloque)
                 self._checkpoints[nombre_bloque] = nodo_entrada
 
         return nodo_entrada
@@ -161,6 +167,7 @@ class ConstructorFlujoTrabajo:
         nombre     = merge_cfg.get("nombre", "merge")
         estrategia = merge_cfg.get("estrategia", "imagen_mascara")
 
+        # FIX: referencia correcta al dict _MERGE_FNS
         if estrategia not in _MERGE_FNS:
             raise ValueError(
                 f"Estrategia de merge desconocida: '{estrategia}'. "
@@ -180,7 +187,6 @@ class ConstructorFlujoTrabajo:
             merge_fn  = merge_fn,
         ))
 
-        # Arista identidad desde imagen → merge
         self.grafo.agregar_arista(AristaOperacion(
             origen    = nodo_img_id,
             destino   = nodo_merge_id,
@@ -191,7 +197,6 @@ class ConstructorFlujoTrabajo:
             )
         ))
 
-        # Arista identidad desde máscara → merge
         self.grafo.agregar_arista(AristaOperacion(
             origen    = nodo_mask_id,
             destino   = nodo_merge_id,
@@ -211,8 +216,8 @@ class ConstructorFlujoTrabajo:
 
     def _crear_y_conectar_operacion(
         self,
-        op_cfg:     Dict,
-        categoria:  CategoriaOperacion,
+        op_cfg:       Dict,
+        categoria:    CategoriaOperacion,
         nodo_entrada: str,
     ) -> str:
         nombre_metodo   = op_cfg["metodo"]
@@ -245,7 +250,6 @@ class ConstructorFlujoTrabajo:
             operacion = operacion,
         ))
 
-        # Anchor explícito en la operación
         if "anchor" in op_cfg:
             self._checkpoints[op_cfg["anchor"]] = nodo_salida
 
@@ -255,7 +259,7 @@ class ConstructorFlujoTrabajo:
     # VALIDACIÓN
     # =========================================================
 
-    def _validar_conexion(self, nodo_entrada: str, operacion):
+    def _validar_conexion(self, nodo_entrada: str, operacion: Operacion) -> None:
         if nodo_entrada not in self.grafo.nodos:
             return
         entrantes_prev = self.grafo.entrantes(nodo_entrada)
@@ -280,7 +284,6 @@ class ConstructorFlujoTrabajo:
     # =========================================================
 
     def _resolver_checkpoint(self, nombre: str) -> str:
-        """Resuelve nombre de checkpoint a nodo_id, o lo usa directo si es nodo_id."""
         if nombre in self._checkpoints:
             return self._checkpoints[nombre]
         if nombre in self.grafo.nodos:

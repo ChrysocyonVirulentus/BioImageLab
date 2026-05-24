@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional, Set, Callable, Tuple
 
 from ..controlador.Resultado_Either import Resultado, Ok, Err, LogEvento, NivelLog
 from ..controlador.Controlador_BioImagen import ErrorBioImagen
@@ -20,11 +20,13 @@ class NodoPipeline:
     id:        str
     tipo_dato: TipoDato
     data:      List[Any] = field(default_factory=list)
-    hay_fusion:  bool                              = False
-    fusion_fn:  Optional[Callable[[List[Any]], Any]] = None   # combina lista de inputs
+
+    # FIX: nombres unificados — el Constructor usa es_merge / merge_fn
+    es_merge:  bool                                  = False
+    merge_fn:  Optional[Callable[[List[Any]], Any]]  = None
 
     def __repr__(self):
-        marca = " [FUSION]" if self.hay_fusion else ""
+        marca = " [MERGE]" if self.es_merge else ""
         return f"<Nodo {self.id}{marca} ({self.tipo_dato.name})>"
 
 
@@ -72,8 +74,6 @@ class GrafoPipeline:
 
     def nodos_finales(self) -> List[NodoPipeline]:
         return [n for n in self.nodos.values() if not self.salientes(n.id)]
-
-    
 
     # -----------------------------
     # Orden topológico (DAG)
@@ -142,31 +142,30 @@ class FlujoTrabajo:
         for nodo_id in orden:
             nodo = self.grafo.nodos[nodo_id]
 
-            # ── FUSION: combinar cuando todos los inputs están listos ─────
-            if nodo.hay_fusion and nodo.fusion_fn is not None:
+            # FIX: usar es_merge / merge_fn (coherente con NodoPipeline corregido)
+            if nodo.es_merge and nodo.merge_fn is not None:
                 n_esperados = len(self.grafo.entrantes(nodo_id))
                 if len(nodo.data) < n_esperados:
-                    # No deberías llegar aquí en un DAG correcto con Kahn
                     return Err(ErrorBioImagen(
-                        etapa="fusion",
+                        etapa="merge",
                         mensaje=(
-                            f"Fusion '{nodo_id}' esperaba {n_esperados} inputs, "
+                            f"Merge '{nodo_id}' esperaba {n_esperados} inputs, "
                             f"recibió {len(nodo.data)}"
                         )
                     ))
                 try:
-                    combinado = nodo.fusion_fn(nodo.data)
+                    combinado = nodo.merge_fn(nodo.data)
                     nodo.data = [combinado]
                     logs_acumulados.append(LogEvento(
-                        etapa   = "fusion",
-                        mensaje = f"Fusion '{nodo_id}' OK ({n_esperados} inputs combinados)",
-                        nivel   = NivelLog.INFO,
-                        metadata= {"nodo": nodo_id, "n_inputs": n_esperados},
+                        etapa    = "merge",
+                        mensaje  = f"Merge '{nodo_id}' OK ({n_esperados} inputs combinados)",
+                        nivel    = NivelLog.INFO,
+                        metadata = {"nodo": nodo_id, "n_inputs": n_esperados},
                     ))
                 except Exception as e:
                     return Err(ErrorBioImagen(
-                        etapa="fusion",
-                        mensaje=f"Error en fusion '{nodo_id}': {e}",
+                        etapa="merge",
+                        mensaje=f"Error en merge '{nodo_id}': {e}",
                         causa=e,
                     ))
 
@@ -178,7 +177,6 @@ class FlujoTrabajo:
             for arista in self.grafo.salientes(nodo_id):
                 resultado = arista.operacion.ejecutar(input_data)
 
-                # Cosechar logs de la caja
                 log_caja = getattr(resultado, "_log", ())
                 logs_acumulados.extend(
                     ev for ev in log_caja if isinstance(ev, LogEvento)
@@ -187,14 +185,14 @@ class FlujoTrabajo:
                 if resultado.es_err():
                     error = resultado.error
                     logs_acumulados.append(LogEvento(
-                        etapa   = f"pipeline -> {getattr(error, 'etapa', '?')}",
-                        mensaje = (
+                        etapa    = f"pipeline -> {getattr(error, 'etapa', '?')}",
+                        mensaje  = (
                             f"[{nodo_id} → {arista.destino}] "
                             f"'{arista.operacion.nombre}' falló: "
                             f"{getattr(error, 'mensaje', str(error))}"
                         ),
-                        nivel   = NivelLog.ERROR,
-                        metadata= {"nodo_origen": nodo_id, "nodo_destino": arista.destino},
+                        nivel    = NivelLog.ERROR,
+                        metadata = {"nodo_origen": nodo_id, "nodo_destino": arista.destino},
                     ))
                     try:
                         error_enriquecido = replace(
@@ -210,10 +208,10 @@ class FlujoTrabajo:
                     return Err(error_enriquecido, tuple(logs_acumulados))
 
                 logs_acumulados.append(LogEvento(
-                    etapa   = arista.operacion.categoria.name.lower(),
-                    mensaje = f"'{arista.operacion.nombre}' OK",
-                    nivel   = NivelLog.INFO,
-                    metadata= {"nodo": nodo_id, "destino": arista.destino},
+                    etapa    = arista.operacion.categoria.name.lower(),
+                    mensaje  = f"'{arista.operacion.nombre}' OK",
+                    nivel    = NivelLog.INFO,
+                    metadata = {"nodo": nodo_id, "destino": arista.destino},
                 ))
 
                 self.grafo.nodos[arista.destino].data.append(resultado.unwrap())
@@ -264,8 +262,8 @@ class FlujoTrabajo:
             nodo_destino = self.grafo.nodos[arista.destino]
             op           = arista.operacion
             if op.tipo_dato_salida is None: continue
-            # Fusion nodes receive MASCARA + IMAGEN — skip strict check
-            if nodo_destino.hay_fusion: continue
+            # FIX: usar es_merge (nombre corregido)
+            if nodo_destino.es_merge: continue
             if nodo_destino.tipo_dato != op.tipo_dato_salida:
                 errores.append(
                     f"TipoDato inconsistente: nodo={nodo_destino.tipo_dato.name} "
@@ -280,7 +278,7 @@ class FlujoTrabajo:
     def reset_datos(self):
         """Limpia todos los nodos para re-ejecución."""
         for nodo in self.grafo.nodos.values():
-            nodo.data = []   # CORREGIDO: era None — data es List[Any]
+            nodo.data = []
 
     def __repr__(self):
         return (
