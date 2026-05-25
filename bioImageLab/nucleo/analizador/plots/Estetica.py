@@ -1,354 +1,179 @@
+# === analizador/plots/Estetica.py ===
 """
-Configuración estética centralizada para todos los módulos de visualización.
-
-Este módulo define EsteticaGrafico, un dataclass que agrupa todos los
-parámetros visuales que son comunes a los distintos tipos de gráfico del
-pipeline: Plots_Estadisticos, Plots_Modelos, Plots_Imagen y
-VisualizadorDimensionalidad.
-
-Uso típico:
-
-    from Estetica import EsteticaGrafico, ESTILOS_PREDEFINIDOS
-
-    # Usar estilo predefinido
-    est = ESTILOS_PREDEFINIDOS['publicacion']
-
-    # O personalizar desde cero
-    est = EsteticaGrafico(
-        paleta='viridis',
-        figsize=(12, 7),
-        fuente_familia='sans-serif',
-        fuente_titulo=16,
-        alpha_puntos=0.9,
-    )
-
-    # Pasar a cualquier función de plots
-    fig, ax = Plots_Estadisticos.histograma(df, columna='media', estetica=est)
-
-Separación de responsabilidades:
-    - EsteticaGrafico controla CÓMO se ve el gráfico (colores, fuentes, tamaños).
-    - Las funciones de cada módulo controlan QUÉ se grafica (datos, ejes, capas).
-    - Los parámetros semánticos (qué columna, qué modelo, etc.) siempre van
-      directamente a la función, nunca dentro de EsteticaGrafico.
-
-Nota sobre seaborn:
-    EsteticaGrafico.aplicar() llama sns.set_style() y plt.rcParams para
-    establecer el estilo globalmente antes de crear la figura. Si se crean
-    múltiples figuras en un notebook, llamar .aplicar() antes de cada una
-    para garantizar consistencia.
+Configuración estética centralizada para todos los plots del analizador.
+Permite personalizar títulos, fuentes, paletas de colores, tamaños, etc.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Union
-import matplotlib.pyplot as plt
-import seaborn as sns
+from typing import Optional, Tuple, List, Dict, Any, Callable
+import matplotlib
+from matplotlib import font_manager as fm
 
 
-@dataclass
-class EsteticaGrafico:
+@dataclass(frozen=True)
+class PaletaColores:
+    """Conjunto de colores para plots categóricos y continuos."""
+    primario:   str = "#2E86AB"      # azul principal
+    secundario: str = "#A23B72"      # magenta
+    terciario:  str = "#F18F01"      # naranja
+    cuaternario:str = "#C73E1D"      # rojo
+    quinario:   str = "#3B1F2B"      # violeta oscuro
+
+    # Continuos
+    continuo:   str = "viridis"
+    divergente: str = "RdBu_r"
+    secuencial: str = "plasma"
+
+    # Categórico para máscaras/etiquetas
+    categorico: Tuple[str, ...] = field(default_factory=lambda: (
+        "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3",
+        "#FF7F00", "#FFFF33", "#A65628", "#F781BF",
+        "#999999", "#66C2A5", "#FC8D62", "#8DA0CB",
+    ))
+
+    def color_etiqueta(self, idx: int) -> str:
+        return self.categorico[idx % len(self.categorico)]
+
+
+@dataclass(frozen=True)
+class Fuentes:
+    """Configuración tipográfica."""
+    familia:        str = "sans-serif"
+    familia_titulo: Optional[str] = None
+    tamano_titulo:  int = 14
+    tamano_subtitulo:int = 12
+    tamano_etiqueta: int = 10
+    tamano_tick:    int = 9
+    tamano_leyenda: int = 9
+    tamano_anotacion:int = 8
+    peso_titulo:    str = "bold"
+    peso_subtitulo: str = "normal"
+
+
+@dataclass(frozen=True)
+class Layout:
+    """Dimensiones y espaciado de figuras."""
+    figsize_default: Tuple[float, float] = (8, 6)
+    figsize_ancho:   Tuple[float, float] = (12, 5)
+    figsize_alto:    Tuple[float, float] = (6, 10)
+    figsize_cuadrado:Tuple[float, float] = (7, 7)
+    dpi:             int = 150
+    padding:         float = 0.3
+    tight_layout:    bool = True
+
+
+@dataclass(frozen=True)
+class EstiloLinea:
+    """Configuración de líneas para plots."""
+    ancho:      float = 1.5
+    estilo:     str = "-"
+    marcador:   Optional[str] = None
+    tamano_marcador: float = 6.0
+    alpha:      float = 0.9
+
+
+@dataclass(frozen=True)
+class Estetica:
     """
-        Parámetros estéticos unificados para todas las funciones de visualización.
-
-        Agrupa en un solo objeto todos los argumentos que habitualmente se
-        repiten en cada llamada a matplotlib/seaborn: paletas, fuentes, tamaños,
-        transparencias y estilo de fondo.
-
-        Puede instanciarse directamente, construirse desde un preset con
-        ESTILOS_PREDEFINIDOS, o copiarse y modificarse con dataclasses.replace().
-
-        Ejemplo de modificación puntual:
-            from dataclasses import replace
-            est_grande = replace(est_base, figsize=(16, 10), fuente_titulo=20)
+    Configuración estética global para plots.
+    Inmutable — para cambiar, crear nueva instancia.
     """
+    paleta:     PaletaColores = field(default_factory=PaletaColores)
+    fuentes:    Fuentes       = field(default_factory=Fuentes)
+    layout:     Layout        = field(default_factory=Layout)
+    linea:      EstiloLinea   = field(default_factory=EstiloLinea)
 
-    # ── Figura ─────────────────────────────────────────────────
-    figsize: Tuple[int, int] = (10, 6)
-    """Tamaño de figura (ancho, alto) en pulgadas."""
+    # Overrides por tipo de plot
+    estilo_mascara_alpha: float = 0.35
+    estilo_overlay_linewidth: float = 1.0
 
-    dpi: int = 100
-    """Resolución de la figura. 100 para pantalla, 300 para publicación."""
+    # Tema matplotlib
+    tema: str = "default"  # "default", "seaborn-v0_8-darkgrid", "ggplot", etc.
 
-    # ── Paletas de color ───────────────────────────────────────
-    paleta: str = 'tab10'
-    """
-    Paleta principal para grupos/categorías discretas.
-    Opciones frecuentes: 'tab10', 'Set1', 'Set2', 'Spectral', 'viridis'.
-    """
+    def aplicar_tema(self) -> None:
+        """Aplica tema matplotlib si está disponible."""
+        if self.tema != "default":
+            try:
+                matplotlib.style.use(self.tema)
+            except (OSError, ValueError):
+                pass  # tema no disponible, seguir con default
 
-    paleta_continua: str = 'viridis'
-    """
-    Paleta para variables continuas (heatmaps, superficies).
-    Opciones: 'viridis', 'plasma', 'coolwarm', 'RdBu_r'.
-    """
+        # Configuración global de fuentes
+        matplotlib.rcParams["font.family"] = self.fuentes.familia
+        matplotlib.rcParams["axes.titlesize"] = self.fuentes.tamano_titulo
+        matplotlib.rcParams["axes.labelsize"] = self.fuentes.tamano_etiqueta
+        matplotlib.rcParams["xtick.labelsize"] = self.fuentes.tamano_tick
+        matplotlib.rcParams["ytick.labelsize"] = self.fuentes.tamano_tick
+        matplotlib.rcParams["legend.fontsize"] = self.fuentes.tamano_leyenda
 
-    paleta_divergente: str = 'RdBu_r'
-    """
-    Paleta para variables con punto neutro (correlaciones, residuos).
-    Opciones: 'RdBu_r', 'coolwarm', 'bwr'.
-    """
-
-    # ── Fuentes ────────────────────────────────────────────────
-    fuente_familia: str = 'serif'
-    """Familia tipográfica: 'serif', 'sans-serif', 'monospace'."""
-
-    fuente_titulo: int = 14
-    """Tamaño de fuente del título principal."""
-
-    fuente_ejes: int = 12
-    """Tamaño de fuente de las etiquetas de los ejes X e Y."""
-
-    fuente_ticks: int = 10
-    """Tamaño de fuente de los valores de los ticks en los ejes."""
-
-    fuente_leyenda: int = 10
-    """Tamaño de fuente de la leyenda."""
-
-    fuente_anotaciones: int = 9
-    """Tamaño de fuente de las anotaciones de texto dentro del gráfico."""
-
-    negrita_titulo: bool = True
-    """Si True, el título se muestra en negrita (fontweight='bold')."""
-
-    negrita_ejes: bool = False
-    """Si True, los labels de los ejes se muestran en negrita."""
-
-    # ── Puntos y marcadores ────────────────────────────────────
-    tamaño_punto: int = 60
-    """Tamaño de los marcadores en scatter plots."""
-
-    alpha_puntos: float = 0.8
-    """Transparencia de los puntos (0=invisible, 1=opaco)."""
-
-    alpha_relleno: float = 0.3
-    """
-    Transparencia de áreas rellenas (violines, barras, kernels KDE).
-    Generalmente menor que alpha_puntos para no tapar los datos.
-    """
-
-    grosor_linea: float = 1.5
-    """Grosor de líneas (bordes de boxplot, contornos, líneas de tendencia)."""
-
-    # ── Grid y fondo ───────────────────────────────────────────
-    estilo_fondo: str = 'whitegrid'
-    """
-    Estilo de seaborn para el fondo:
-        'whitegrid'  : fondo blanco con grid (recomendado para publicación).
-        'darkgrid'   : fondo gris con grid (presentaciones).
-        'white'      : fondo blanco sin grid.
-        'ticks'      : solo ticks, sin grid.
-    """
-
-    grid: bool = True
-    """Si True, muestra grid en el gráfico."""
-
-    grid_axis: str = 'both'
-    """Eje del grid: 'both', 'x', 'y'."""
-
-    grid_alpha: float = 0.4
-    """Transparencia del grid."""
-
-    grid_linestyle: str = '--'
-    """Estilo de línea del grid: '--', '-', ':', '-.'."""
-
-    quitar_spine_top: bool = True
-    """Si True, elimina el borde superior del gráfico."""
-
-    quitar_spine_right: bool = True
-    """Si True, elimina el borde derecho del gráfico."""
-
-    # ── Leyenda ────────────────────────────────────────────────
-    leyenda_fuera: bool = False
-    """Si True, coloca la leyenda fuera del área de plot (bbox_to_anchor)."""
-
-    leyenda_loc: str = 'best'
-    """Posición de la leyenda: 'best', 'upper right', 'lower left', etc."""
-
-    leyenda_marco: bool = True
-    """Si True, dibuja el recuadro de la leyenda."""
-
-    # ── Colores específicos ────────────────────────────────────
-    color_mediana: str = 'black'
-    """Color de la línea de mediana en boxplots."""
-
-    color_media: str = 'red'
-    """Color del marcador de media (si se muestra)."""
-
-    color_referencia: str = 'gray'
-    """Color de líneas de referencia (x=0, y=0, umbrales)."""
-
-    color_outlier: str = 'crimson'
-    """Color de outliers o puntos atípicos."""
-
-    # ── Opciones de guardado ───────────────────────────────────
-    bbox_inches: str = 'tight'
-    """Ajuste del bounding box al guardar: 'tight' elimina márgenes vacíos."""
-
-    formato_guardado: str = 'png'
-    """Formato por defecto al guardar: 'png', 'pdf', 'svg', 'tiff'."""
-
-    def aplicar(self) -> None:
-        """
-            Aplica el estilo globalmente via seaborn y matplotlib.rcParams.
-
-            Debe llamarse una vez antes de crear la figura para garantizar
-            que todos los parámetros estéticos se apliquen correctamente.
-            Llamar de nuevo entre figuras si se cambia el estilo a mitad del
-            notebook.
-        """
-        sns.set_style(self.estilo_fondo)
-        plt.rcParams.update({
-            'font.family':    self.fuente_familia,
-            'font.size':      self.fuente_ticks,
-            'axes.titlesize': self.fuente_titulo,
-            'axes.labelsize': self.fuente_ejes,
-            'xtick.labelsize':self.fuente_ticks,
-            'ytick.labelsize':self.fuente_ticks,
-            'legend.fontsize':self.fuente_leyenda,
-            'figure.dpi':     self.dpi,
-            'lines.linewidth':self.grosor_linea,
-        })
-
-    def aplicar_a_ax(self, ax, titulo: str = '', xlabel: str = '',
-                    ylabel: str = '') -> None:
-        """
-            Aplica estilo estándar a un Axes ya creado.
-
-            Llamar al final de cada función de plot para garantizar coherencia
-            visual entre todos los gráficos del pipeline.
-
-            Args:
-                ax:     Axes de matplotlib sobre el que aplicar el estilo.
-                titulo: Título del gráfico.
-                xlabel: Etiqueta del eje X.
-                ylabel: Etiqueta del eje Y.
-        """
-        titulo_kw = {'fontweight': 'bold'} if self.negrita_titulo else {}
-        ejes_kw   = {'fontweight': 'bold'} if self.negrita_ejes   else {}
-
-        if titulo:
-            ax.set_title(titulo, fontsize=self.fuente_titulo,
-                         fontfamily=self.fuente_familia, **titulo_kw)
-        if xlabel:
-            ax.set_xlabel(xlabel, fontsize=self.fuente_ejes,
-                          fontfamily=self.fuente_familia, **ejes_kw)
-        if ylabel:
-            ax.set_ylabel(ylabel, fontsize=self.fuente_ejes,
-                          fontfamily=self.fuente_familia, **ejes_kw)
-
-        if self.grid:
-            ax.grid(True, linestyle=self.grid_linestyle,
-                    alpha=self.grid_alpha, axis=self.grid_axis)
-        else:
-            ax.grid(False)
-
-        if self.quitar_spine_top:
-            ax.spines['top'].set_visible(False)
-        if self.quitar_spine_right:
-            ax.spines['right'].set_visible(False)
-
-    def kwargs_leyenda(self, titulo_leyenda: str = '') -> Dict:
-        """
-        Devuelve dict de kwargs para ax.legend() coherente con este estilo.
-
-        Args:
-            titulo_leyenda: Título de la leyenda.
-
-        Returns:
-            Dict listo para desempacar en ax.legend(**kwargs).
-        """
-        kwargs: Dict = {
-            'frameon':   self.leyenda_marco,
-            'fontsize':  self.fuente_leyenda,
+    def figsize(self, tipo: str = "default") -> Tuple[float, float]:
+        mapping = {
+            "default":  self.layout.figsize_default,
+            "ancho":    self.layout.figsize_ancho,
+            "alto":     self.layout.figsize_alto,
+            "cuadrado": self.layout.figsize_cuadrado,
         }
-        if titulo_leyenda:
-            kwargs['title'] = titulo_leyenda
-        if self.leyenda_fuera:
-            kwargs['bbox_to_anchor'] = (1.02, 1)
-            kwargs['loc']            = 'upper left'
-        else:
-            kwargs['loc'] = self.leyenda_loc
-        return kwargs
+        return mapping.get(tipo, self.layout.figsize_default)
+
+    def color(self, idx: int = 0, nombre: Optional[str] = None) -> str:
+        if nombre:
+            return getattr(self.paleta, nombre, self.paleta.primario)
+        return self.paleta.color_etiqueta(idx)
+
+    def cmap(self, tipo: str = "continuo") -> str:
+        mapping = {
+            "continuo":   self.paleta.continuo,
+            "divergente": self.paleta.divergente,
+            "secuencial": self.paleta.secuencial,
+        }
+        return mapping.get(tipo, self.paleta.continuo)
+
+    def con_tema(self, tema: str) -> "Estetica":
+        from dataclasses import replace
+        return replace(self, tema=tema)
+
+    def con_paleta(self, paleta: PaletaColores) -> "Estetica":
+        from dataclasses import replace
+        return replace(self, paleta=paleta)
+
+    def con_fuentes(self, fuentes: Fuentes) -> "Estetica":
+        from dataclasses import replace
+        return replace(self, fuentes=fuentes)
+
+    def con_layout(self, layout: Layout) -> "Estetica":
+        from dataclasses import replace
+        return replace(self, layout=layout)
 
 
-# ─────────────────────────────────────────────────────────────
-# Estilos predefinidos
-# ─────────────────────────────────────────────────────────────
+def estetica_publicacion() -> Estetica:
+    """Estética lista para publicación científica."""
+    return Estetica(
+        paleta=PaletaColores(
+            primario="#000000", secundario="#E69F00",
+            terciario="#56B4E9", cuaternario="#009E73",
+            continuo="cividis", divergente="PuOr_r",
+        ),
+        fuentes=Fuentes(
+            familia="serif", tamano_titulo=12, tamano_etiqueta=10,
+            tamano_tick=8, peso_titulo="bold",
+        ),
+        layout=Layout(dpi=300, figsize_default=(6, 4.5)),
+    )
 
-ESTILOS_PREDEFINIDOS: Dict[str, EsteticaGrafico] = {
 
-    'default': EsteticaGrafico(),
-
-    'publicacion': EsteticaGrafico(
-        figsize=(8, 5),
-        dpi=300,
-        paleta='tab10',
-        paleta_continua='viridis',
-        fuente_familia='serif',
-        fuente_titulo=12,
-        fuente_ejes=11,
-        fuente_ticks=10,
-        fuente_leyenda=10,
-        alpha_puntos=0.85,
-        alpha_relleno=0.25,
-        grosor_linea=1.2,
-        estilo_fondo='white',
-        grid=True,
-        grid_axis='y',
-        grid_alpha=0.3,
-        negrita_titulo=True,
-        negrita_ejes=False,
-    ),
-
-    'presentacion': EsteticaGrafico(
-        figsize=(14, 8),
-        dpi=120,
-        paleta='Set2',
-        paleta_continua='plasma',
-        fuente_familia='sans-serif',
-        fuente_titulo=18,
-        fuente_ejes=14,
-        fuente_ticks=12,
-        fuente_leyenda=12,
-        alpha_puntos=0.9,
-        alpha_relleno=0.4,
-        grosor_linea=2.0,
-        estilo_fondo='darkgrid',
-        grid=True,
-        grid_axis='both',
-        grid_alpha=0.3,
-        negrita_titulo=True,
-        negrita_ejes=True,
-        leyenda_fuera=False,
-    ),
-
-    'exploratorio': EsteticaGrafico(
-        figsize=(10, 6),
-        dpi=90,
-        paleta='Spectral',
-        fuente_familia='sans-serif',
-        fuente_titulo=13,
-        fuente_ejes=11,
-        alpha_puntos=0.7,
-        alpha_relleno=0.35,
-        estilo_fondo='whitegrid',
-    ),
-
-    'microscopio': EsteticaGrafico(
-        figsize=(10, 8),
-        dpi=150,
-        paleta='tab20',
-        paleta_continua='inferno',
-        paleta_divergente='coolwarm',
-        fuente_familia='sans-serif',
-        fuente_titulo=13,
-        fuente_ejes=11,
-        fuente_ticks=10,
-        alpha_puntos=0.75,
-        alpha_relleno=0.3,
-        estilo_fondo='white',
-        grid=True,
-        grid_axis='both',
-        grid_alpha=0.25,
-        leyenda_fuera=True,
-    ),
-}
+def estetica_oscuro() -> Estetica:
+    """Estética con fondo oscuro para presentaciones."""
+    return Estetica(
+        paleta=PaletaColores(
+            primario="#00D9FF", secundario="#FF6B9D",
+            terciario="#FFE66D", cuaternario="#95E1D3",
+            continuo="magma", divergente="coolwarm",
+        ),
+        fuentes=Fuentes(
+            familia="sans-serif", tamano_titulo=16,
+            tamano_etiqueta=12, tamano_tick=10,
+        ),
+        layout=Layout(dpi=150, figsize_default=(10, 7)),
+        tema="dark_background",
+    )
