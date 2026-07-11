@@ -270,9 +270,10 @@ nucleo/
     ├── Categoria_Operacion.py
     ├── Operacion.py
     ├── Flujo_PRocesameinto.py
-    ├── Pipeline.py
+    ├── Flujo_Trabajo.py
+    ├── Log.py
     ├── Pipeline_Builder.py
-    └── Gestor_Ramas.py
+    └── Gestor_Lab.py
 ```
 
 ```bash
