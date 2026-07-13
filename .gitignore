@@ -17,6 +17,7 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv_bioimagelab/
 
 # =========================
 # VARIABLES DE ENTORNO

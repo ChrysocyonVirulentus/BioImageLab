@@ -51,6 +51,14 @@ source ~/.zshrc
 
 ```
 
+Crear maquina virtual de python
+
+```bash
+python3 -m venv .venv_bioimagelab
+source .venv_bioimagelab/bin/activate
+python -m pip install --upgrade pip
+```
+
 Instala las dependencias 
 
 ```bash
