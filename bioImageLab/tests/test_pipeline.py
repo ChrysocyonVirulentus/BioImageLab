@@ -601,7 +601,7 @@ class TestControladores:
         from nucleo.controlador.Controlador_Normalizador import Controlador_Normalizador
         from nucleo.controlador.Estrategias_Aplicacion import Global
         ctrl = Controlador_Normalizador()
-        op   = ctrl.crear_operador_max_norm(tipo=Global(), canal=0)  # imperativo
+        op   = ctrl.crear_operacion_max_norm(tipo=Global(), canal=0)  # imperativo
         # Usar via crear_operacion
         from nucleo.gestorLab.Categoria_Operacion import CategoriaOperacion
         operacion = ctrl.crear_operacion(
@@ -648,20 +648,23 @@ class TestControladores:
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestCuantificador:
-    def test_media_intensidad_retorna_dataframe(self):
-        """MediaIntensidad recibe (img_segmentada, img_procesada) → pd.DataFrame."""
-        import pandas as pd
+    def test_media_intensidad_retorna_float(self):
+        """MediaIntensidad recibe (img_segmentada, img_procesada) y retorna un float."""
         import numpy as np
-        from nucleo.cuantificador.intensidad.Cuantificadores_Intensidad import MediaIntensidad
+        from nucleo.cuantificador.intensidad.Cuantificadores_Intensidad import (
+            MediaIntensidad,
+        )
 
-        rng  = np.random.default_rng(0)
+        rng = np.random.default_rng(0)
         mask = (rng.integers(0, 2, (64, 64)) * 255).astype(np.uint8)
-        img  = rng.integers(0, 4096, (64, 64)).astype(np.uint16)
+        img = rng.integers(0, 4096, (64, 64)).astype(np.uint16)
 
         met = MediaIntensidad()
         res = met(mask, img)
-        assert isinstance(res, pd.DataFrame)
-        assert not res.empty
+
+        assert isinstance(res, float)
+        assert np.isfinite(res)
+        assert 0.0 <= res <= 4095.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ from __future__ import annotations # Para manejar el tipado limpio
 from dataclasses import dataclass, field
 from typing import Generic, Dict, TypeVar, Callable, Union, Final, Generator, Any, Iterable
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 import numpy as np
 
@@ -38,7 +38,7 @@ class LogEvento:
     mensaje:   str
     nivel:     NivelLog
     metadata:  Dict[str, Any]  = field(default_factory=dict)
-    timestamp: str             = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str             = field(default_factory=lambda: datetime.now(UTC).isoformat()) # Ya no se usa datetime.utcnow()
 
     def to_dict(self) -> dict:
         return {"etapa": self.etapa, "mensaje": self.mensaje, "metadata": self.metadata}

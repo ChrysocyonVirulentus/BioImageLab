@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import List, Optional, Union, Any
 
@@ -29,7 +29,7 @@ class RecolectorLog:
     def __init__(self, nombre_pipeline: str):
         self._nombre    = nombre_pipeline
         self._eventos:  List[LogEvento] = []
-        self._inicio:   datetime = datetime.utcnow()
+        self._inicio:   datetime = datetime.now(UTC) # Ya no se usa datetime.utcnow()
 
     # ── cosecha ──────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ class RecolectorLog:
             f"{'='*60}",
             f"  PIPELINE : {self._nombre}",
             f"  INICIO   : {self._inicio.isoformat()}",
-            f"  FIN      : {datetime.utcnow().isoformat()}",
+            f"  FIN      : {datetime.now(UTC).isoformat()}", # ya no se usa datetime.utcnow()
             f"  EVENTOS  : {len(self._eventos)}",
             f"  ERRORES  : {len(self.filtrar(NivelLog.ERROR))}",
             f"  WARNINGS : {len(self.filtrar(NivelLog.WARN))}",
@@ -117,7 +117,7 @@ class RecolectorLog:
         payload = {
             "pipeline":  self._nombre,
             "inicio":    self._inicio.isoformat(),
-            "fin":       datetime.utcnow().isoformat(),
+            "fin":       datetime.now(UTC).isoformat(), # ya no se usa datetime.utcnow()
             "resumen": {
                 "total":    len(self._eventos),
                 "errores":  len(self.filtrar(NivelLog.ERROR)),
