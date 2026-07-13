@@ -1,13 +1,40 @@
+# =====================================================================
+# Pipeline de prueba: preprocesamiento → filtrado → split → merge → cuantificación
+#
+# Flujo:
+#   input ─── max_norm ─── fft_pasabajo ─── (rama principal)
+#                                    │
+#                                    └── split: to_uint8 → otsu
+#                                               (rama segmentación)
+#                                    │
+#                                    └── merge(filtracion, rama_seg)
+#                                               │
+#                                          MediaIntensidad
+# =====================================================================
+
 nombre_pipeline: "mi_pipeline"
+
+# Rutas (ajustar según entorno)
 ruta_imagen: "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/glp1_1.ids"
 ruta_log:    "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/mi_pipeline_yaml.log"
 
+# QC visual paso a paso (requiere matplotlib)
+modo_qc:  false
+ruta_qc:  "/home/nyarlathotep/Documentos/Programacion/ProjectosBioinformaticos/BioImageLab/bioImageLab/test_data/qc_mi_pipeline.png"
+canal_qc: 0
+
+# false = ejecutar siempre aunque la validación detecte errores (patrón Result)
+# true  = abortar si hay errores duros en validación
+modo_estricto: false
+
 etapas:
+  # ── Rama principal ────────────────────────────────────────
   - preprocesamiento:
       - metodo: max_norm
         dominio: normalizacion
         canal: 0
         tipo_aplicacion: global
+        anchor: post_norm          # checkpoint: "post_norm"
 
   - filtracion:
       - metodo: fft_pasabajo
@@ -16,21 +43,34 @@ etapas:
         tipo_aplicacion: por_corte_espaciotemporal
         params:
           radio: 5
+        anchor: post_filtrado      # checkpoint: "post_filtrado"
 
-  -split_1 (segmentacion) :
-    - preprocesamiento:
-        - metodo: to_uint8
-          dominio: normalizacion
-          canal: 0
-          tipo_aplicacion: global
+  # ── Rama split: segmentación paralela ─────────────────────
+  - split:
+      nombre: rama_segmentacion
+      desde:  post_norm            # parte desde la imagen normalizada
+      etapas:
+        - preprocesamiento:
+            - metodo: to_uint8
+              dominio: normalizacion
+              canal: 0
+              tipo_aplicacion: global
 
-    - segmentacion:
-        - metodo: otsu
-          dominio: segmentacion
-          canal: 0
-          tipo_aplicacion: por_corte_espaciotemporal
-  
-  -merge (split_1, filtracion):
+        - segmentacion:
+            - metodo: otsu
+              dominio: segmentacion
+              canal: 0
+              tipo_aplicacion: por_corte_espaciotemporal
 
-  -cuantificacion:
-    -metodo: MediaIntensidad
+  # ── Merge: une imagen filtrada + máscara ──────────────────
+  - merge:
+      nombre:    fusion_principal
+      estrategia: imagen_mascara
+      imagen:    post_filtrado      # checkpoint de la rama principal
+      mascara:   rama_segmentacion  # checkpoint del split
+
+  # ── Cuantificación sobre el merge ─────────────────────────
+  - cuantificacion:
+      - metodo: media_intensidad
+        dominio: cuantificacion
+        canal: 0
