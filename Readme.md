@@ -75,7 +75,7 @@ pip3 install -r requirements.txt
 │     (Preparar datos)  │ Flat-field, dark-current, white balance│
 ├─────────────────────────────────────────────────────────────┤
 │  2. FILTRACIÓN        │ Reducción de ruido, suavizado         │
-│     (Limpiar señal)   │ Gaussiano, mediana, Wiener, NLMeans   │
+│     (Limpiar señal)   │ Gaussiano, mediana, Wiener, NLMeans   │ <- Aumentar la Señal/Ruido
 ├─────────────────────────────────────────────────────────────┤
 │  3. REALZADORES       │ Mejora de características visibles    │
 │     (Resaltar info)   │ Contraste adaptativo, sharpening,     │

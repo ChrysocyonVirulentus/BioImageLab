@@ -6,12 +6,12 @@ from datetime import datetime, UTC
 from pathlib import Path
 import numpy as np
 
-# Patrón Result Refactorizado para que se comporte funcionalmente como Either.
+# Patrón Result para que se comporte funcionalmente como Either.
 
 T = TypeVar("T") # Type (Tipo exitoso), dato "bueno"
 U = TypeVar("U") # Updated (Nuevo Tipo) , luego de una transformación
 E = TypeVar("E") # Error (Excepcion de error)
-F = TypeVar("F") # Failed-Transformation (Nuevo tipo de error su se decide transformar el error anterior)
+F = TypeVar("F") # Failed-Transformation (Nuevo tipo de error si se decide transformar el error anterior)
 
 @dataclass(frozen=True)
 class ErrorPipeline:
