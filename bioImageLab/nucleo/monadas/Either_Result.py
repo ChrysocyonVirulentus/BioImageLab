@@ -44,7 +44,7 @@ class LogEvento:
         return {"etapa": self.etapa, "mensaje": self.mensaje, "metadata": self.metadata}
 
 # La idea de esta arquitectura es que quede a la Haskell de: Resultado = Either + Writer, o sea un  WriterT [Log] (Either Error) a
-class Resultado(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
+class Either(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
     """
         Either Result para pipeline de bioimágenes, con el comportamiento de encadenamiento de Monada
     """
@@ -101,7 +101,7 @@ class Resultado(Generic[T, E]): # Caja con un exito tipo T o un error tipo E
         return self
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True) # Inmutable
 class Ok(Resultado[T, E]):
     _value: T  # privado por convención
     _log:   tuple = ()  # tuple[LogEvento, ...]
