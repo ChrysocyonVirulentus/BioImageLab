@@ -1,0 +1,34 @@
+# =====================================================================
+# Pipeline simple para probar el CLI (run).
+# Termina en segmentación — el dominio "cuantificacion" tiene bugs
+# propios (arity y dimensionalidad) fuera del alcance de la CLI.
+#
+# Flujo: input → max_norm → to_uint8 → otsu
+# =====================================================================
+
+nombre_pipeline: "pipeline_cli_test"
+
+ruta_log:      "log_cli_test.txt"
+modo_qc:       false
+ruta_qc:       "qc_cli_test.png"
+canal_qc:      0
+modo_estricto: false
+
+etapas:
+  - preprocesamiento:
+      - metodo: max_norm
+        dominio: normalizacion
+        canal: 0
+        tipo_aplicacion: global
+
+  - preprocesamiento:
+      - metodo: to_uint8
+        dominio: normalizacion
+        canal: 0
+        tipo_aplicacion: global
+
+  - segmentacion:
+      - metodo: otsu
+        dominio: segmentacion
+        canal: 0
+        tipo_aplicacion: por_corte_espaciotemporal
