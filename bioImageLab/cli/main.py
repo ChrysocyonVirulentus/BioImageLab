@@ -27,21 +27,22 @@ def cli():
 # ==========================================
 
 def _resumir_dato(nombre_nodo: str, dato) -> str:
-    """
-    Genera una descripción legible de qué hay en un nodo final del pipeline:
-      - BioImagenData -> shape, dtype, rango de valores
-      - DataFrame     -> shape, columnas
-      - Otro          -> repr básico
-    """
     if isinstance(dato, BioImagenData):
         arr = dato.datos
-        return (
-            f"  • {nombre_nodo}\n"
-            f"      tipo:   imagen (BioImagenData)\n"
-            f"      shape:  {dato.dims.shape}  (T,Z,C,Y,X)\n"
-            f"      dtype:  {arr.dtype}\n"
-            f"      rango:  [{arr.min():.4g}, {arr.max():.4g}]"
-        )
+        lineas = [
+            f"  • {nombre_nodo}",
+            f"      tipo:   imagen (BioImagenData)",
+            f"      shape:  {dato.dims.shape}  (T,Z,C,Y,X)",
+            f"      dtype:  {arr.dtype}",
+        ]
+        for c in range(dato.dims.C):
+            canal_arr = arr[:, :, c, :, :]
+            nombre_canal = dato.canales[c] if c < len(dato.canales) else str(c)
+            lineas.append(
+                f"      canal {c} ({nombre_canal}): rango [{canal_arr.min():.4g}, {canal_arr.max():.4g}]"
+            )
+        return "\n".join(lineas)
+
     if pd is not None and isinstance(dato, pd.DataFrame):
         return (
             f"  • {nombre_nodo}\n"
