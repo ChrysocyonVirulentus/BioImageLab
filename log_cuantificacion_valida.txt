@@ -1,108 +1,98 @@
 ============================================================
-  PIPELINE : pipeline_cuantificacion_repro
-  INICIO   : 2026-08-13T14:46:39.231658+00:00
-  FIN      : 2026-08-13T14:46:48.909659+00:00
-  EVENTOS  : 21
-  ERRORES  : 3
-  WARNINGS : 3
+  PIPELINE : pipeline_cuantificacion_valida
+  INICIO   : 2026-08-13T15:26:24.626761+00:00
+  FIN      : 2026-08-13T15:26:33.377759+00:00
+  EVENTOS  : 20
+  ERRORES  : 2
+  WARNINGS : 0
 ============================================================
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.626761+00:00] ✓ [INFO]
   etapa  : validacion_dag
   mensaje: DAG válido — 6 nodos en orden topológico
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.626761+00:00] ✓ [INFO]
   etapa  : validacion_estructura
   mensaje: Nodos iniciales: ['input']
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.626761+00:00] ✓ [INFO]
   etapa  : validacion_estructura
   mensaje: Nodos finales: ['input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu_cuantificacion_area']
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.626761+00:00] ✓ [INFO]
   etapa  : validacion_dependencias/preprocesamiento_max_norm
   mensaje: Dependencias OK para 'preprocesamiento_max_norm' (PREPROCESAMIENTO)
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.626761+00:00] ✓ [INFO]
   etapa  : validacion_dependencias/procesamiento_fft_pasabajo
   mensaje: Dependencias OK para 'procesamiento_fft_pasabajo' (FILTRACION)
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.626761+00:00] ✓ [INFO]
   etapa  : validacion_semantica/procesamiento_fft_pasabajo
   mensaje: Compatibilidad OK: PREPROCESAMIENTO → FILTRACION
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_dependencias/preprocesamiento_to_uint8
   mensaje: Dependencias OK para 'preprocesamiento_to_uint8' (PREPROCESAMIENTO)
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_semantica/preprocesamiento_to_uint8
   mensaje: Compatibilidad OK: FILTRACION → PREPROCESAMIENTO
 
-[2026-08-13T14:46:39.231658+00:00] ⚠ [WARN]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_dependencias/segmentacion_otsu
-  mensaje: SEGMENTADOR recomienda haber ejecutado: FILTRACION (resultados pueden ser subóptimos)
-  operacion: segmentacion_otsu
-  categoria: SEGMENTADOR
+  mensaje: Dependencias OK para 'segmentacion_otsu' (SEGMENTADOR)
 
-[2026-08-13T14:46:39.231658+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_semantica/segmentacion_otsu
   mensaje: Compatibilidad OK: PREPROCESAMIENTO → SEGMENTADOR
 
-[2026-08-13T14:46:39.232661+00:00] ✗ [ERROR]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_dependencias/cuantificacion_area
-  mensaje: CUANTIFICADOR requiere obligatoriamente: PREPROCESAMIENTO
-  operacion: cuantificacion_area
-  categoria: CUANTIFICADOR
+  mensaje: Dependencias OK para 'cuantificacion_area' (CUANTIFICADOR)
 
-[2026-08-13T14:46:39.232661+00:00] ⚠ [WARN]
-  etapa  : validacion_dependencias/cuantificacion_area
-  mensaje: CUANTIFICADOR recomienda haber ejecutado: FILTRACION (resultados pueden ser subóptimos)
-  operacion: cuantificacion_area
-  categoria: CUANTIFICADOR
-
-[2026-08-13T14:46:39.232661+00:00] ✓ [INFO]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_semantica/cuantificacion_area
   mensaje: Compatibilidad OK: SEGMENTADOR → CUANTIFICADOR
 
-[2026-08-13T14:46:39.232661+00:00] ⚠ [WARN]
+[2026-08-13T15:26:24.627760+00:00] ✓ [INFO]
   etapa  : validacion_resumen
-  mensaje: [Validación ✗ CON ERRORES] 1 errores  2 warnings  10 infos
+  mensaje: [Validación ✓ VÁLIDO] 0 errores  0 warnings  12 infos
 
-[2026-08-13T14:46:48.644660+00:00] ✓ [INFO]
+[2026-08-13T15:26:33.185758+00:00] ✓ [INFO]
   etapa  : carga
   mensaje: Imagen cargada: shape=(10, 1, 1, 256, 256) canales=(np.str_('Channel:0:0'),)
 
-[2026-08-13T14:46:48.688661+00:00] ✓ [INFO]
+[2026-08-13T15:26:33.195758+00:00] ✓ [INFO]
   etapa  : preprocesamiento
   mensaje: 'preprocesamiento_max_norm' OK
   nodo    : input
   destino : input_preprocesamiento_max_norm
 
-[2026-08-13T14:46:48.863686+00:00] ✓ [INFO]
+[2026-08-13T15:26:33.333760+00:00] ✓ [INFO]
   etapa  : filtracion
   mensaje: 'procesamiento_fft_pasabajo' OK
   nodo    : input_preprocesamiento_max_norm
   destino : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo
 
-[2026-08-13T14:46:48.873660+00:00] ✓ [INFO]
+[2026-08-13T15:26:33.343759+00:00] ✓ [INFO]
   etapa  : preprocesamiento
   mensaje: 'preprocesamiento_to_uint8' OK
   nodo    : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo
   destino : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8
 
-[2026-08-13T14:46:48.905659+00:00] ✓ [INFO]
+[2026-08-13T15:26:33.373760+00:00] ✓ [INFO]
   etapa  : segmentador
   mensaje: 'segmentacion_otsu' OK
   nodo    : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8
   destino : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu
 
-[2026-08-13T14:46:48.908659+00:00] ✗ [ERROR]
+[2026-08-13T15:26:33.376758+00:00] ✗ [ERROR]
   etapa  : pipeline -> cuantificacion
   mensaje: [input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu → input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu_cuantificacion_area] 'cuantificacion_area' falló: Error en 'area': Imagen debe ser 2D, tiene 4 dimensiones
   nodo_origen: input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu
   nodo_destino: input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu_cuantificacion_area
 
-[2026-08-13T14:46:48.908659+00:00] ✗ [ERROR]
+[2026-08-13T15:26:33.376758+00:00] ✗ [ERROR]
   etapa  : pipeline
   mensaje: Ejecución con fallo: [input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu → input_preprocesamiento_max_norm_procesamiento_fft_pasabajo_preprocesamiento_to_uint8_segmentacion_otsu_cuantificacion_area] 'cuantificacion_area' falló: Error en 'area': Imagen debe ser 2D, tiene 4 dimensiones

@@ -1,0 +1,3 @@
+archivo	estado	n_errores_log	n_warnings_log	nodos_finales
+bioImageLab\test_data\B4mch 1.ics	ok	0	0	input_preprocesamiento_max_norm
+bioImageLab\test_data\glp1_1.ics	ok	0	0	input_preprocesamiento_max_norm

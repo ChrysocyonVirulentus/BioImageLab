@@ -1,0 +1,17 @@
+# =====================================================================
+# Pipeline mínimo para probar `run-batch`.
+# Un solo paso: normalización (max_norm) sobre el canal 0.
+# =====================================================================
+
+nombre_pipeline: "pipeline_simple"
+
+modo_qc: false
+modo_estricto: false
+
+etapas:
+  - preprocesamiento:
+      - metodo: max_norm
+        dominio: normalizacion
+        canal: 0
+        tipo_aplicacion: global
+        anchor: post_norm

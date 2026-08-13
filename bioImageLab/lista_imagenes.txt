@@ -1,0 +1,3 @@
+# Una ruta de imagen por línea. Las líneas que empiezan con # se ignoran.
+test_data/glp1_1.ics
+test_data/B4mch 1.ics

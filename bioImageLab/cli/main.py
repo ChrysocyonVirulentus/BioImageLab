@@ -13,6 +13,9 @@ except ImportError:
 from bioImageLab.nucleo.gestorLab.Gestor_Lab import GestorLab
 from bioImageLab.nucleo.controlador.Controlador_BioImagen import BioImagenData
 
+# CAMBIO 1: formatos de imagen aceptados por BioImageLab para --dir.
+FORMATOS_BIOIMAGEN = {".ids", ".ics", ".tif", ".tiff"}
+
 
 @click.group()
 def cli():
@@ -118,7 +121,16 @@ def run(yaml_path, imagen_path, debug, dir_salida):
 
     click.echo(f"Pipeline registrado: {flujo.nombre}")
 
-    resultado = gestor.ejecutar_desde_ruta(flujo.nombre, imagen_path, debug=debug)
+    # CAMBIO 2: proteger la ejecución individual para que una excepción
+    # inesperada no termine mostrando un traceback completo al usuario.
+    try:
+        resultado = gestor.ejecutar_desde_ruta(
+            flujo.nombre,
+            imagen_path,
+            debug=debug,
+        )
+    except Exception as e:
+        raise click.ClickException(f"Error durante la ejecución: {e}")
 
     if resultado.es_ok():
         salida, logs = resultado.unwrap()
@@ -145,6 +157,143 @@ def run(yaml_path, imagen_path, debug, dir_salida):
         raise SystemExit(1)
 
 
+# ==========================================
+# COMANDO: run batch
+# ==========================================
+
+@cli.command(name="batch")  # CAMBIO 3: antes era run-batch
+@click.option(
+    "--yaml",
+    "yaml_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--dir",
+    "dir_imagenes",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Carpeta con las imágenes a procesar.",
+)
+@click.option(
+    "--glob",
+    "patron_glob",
+    default="*",
+    show_default=True,
+    help="Patrón para filtrar archivos dentro de --dir (ej: '*.tif').",
+)
+@click.option(
+    "--lista",
+    "ruta_lista",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Archivo .txt con un nombre de imagen por línea.",
+)
+@click.option(
+    "--base-dir",
+    "dir_base",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Directorio base para las rutas indicadas en --lista.",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Activa debug: imprime cada paso por imagen.",
+)
+@click.option(
+    "--output",
+    "dir_salida",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Directorio donde guardar los resultados de cada imagen.",
+)
+@click.option(
+    "--log-batch",
+    "ruta_log_batch",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Ruta donde guardar el resumen TSV del batch.",
+)
+def batch(yaml_path, dir_imagenes, patron_glob, ruta_lista, dir_base, debug, dir_salida, ruta_log_batch):
+    """
+    Ejecuta un pipeline sobre un batch de imágenes (carpeta+glob o lista .txt).
+    """
+    # CAMBIO 4: validación explícita de las dos fuentes posibles del batch.
+    if dir_imagenes is None and ruta_lista is None:
+        raise click.ClickException("Tenés que pasar --dir o --lista (uno de los dos).")
+
+    if dir_imagenes is not None and ruta_lista is not None:
+        raise click.ClickException("--dir y --lista son mutuamente excluyentes, pasá solo uno.")
+
+    gestor = GestorLab()
+
+    try:
+        flujo = gestor.registrar_desde_yaml(yaml_path)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        raise click.ClickException(f"No se pudo registrar el pipeline: {e}")
+
+    click.echo(f"Pipeline registrado: {flujo.nombre}")
+
+    # --- armar y disparar el batch según la opción elegida ---
+    if dir_imagenes is not None:
+        # CAMBIO 5: filtrar directorios y formatos no soportados.
+        rutas = sorted(
+            ruta
+            for ruta in dir_imagenes.glob(patron_glob)
+            if ruta.is_file() and ruta.suffix.lower() in FORMATOS_BIOIMAGEN
+        )
+        if not rutas:
+            raise click.ClickException(
+                f"No se encontraron imágenes válidas con patrón '{patron_glob}' en '{dir_imagenes}'."
+            )
+        click.echo(f"  {len(rutas)} imagen(es) encontradas en '{dir_imagenes}'")
+        resultados = gestor.ejecutar_batch(
+            nombre=flujo.nombre,
+            rutas_imagenes=rutas,
+            debug=debug,
+            ruta_log_batch=ruta_log_batch,
+        )
+    else:
+        resultados = gestor.ejecutar_batch_desde_archivo(
+            nombre=flujo.nombre,
+            ruta_lista=ruta_lista,
+            directorio=dir_base,  # CAMBIO 6: base-dir para rutas relativas del TXT.
+            debug=debug,
+            ruta_log_batch=ruta_log_batch,
+        )
+
+    # --- reportar / guardar cada resultado ---
+    n_ok = n_err = 0
+    for ruta_str, resultado in resultados.items():
+        click.echo(f"\n── {ruta_str}")
+        if resultado.es_ok():
+            n_ok += 1
+            salida, logs = resultado.unwrap()
+            n_e = sum(1 for l in logs if l.nivel.value == "error")
+            n_w = sum(1 for l in logs if l.nivel.value == "warn")
+            click.secho(f"  ✓ OK ({len(salida)} nodo(s) final(es))", fg="green")
+            if n_e or n_w:
+                click.echo(f"    ({n_e} errores, {n_w} warnings en el log)")
+
+            for nombre_nodo, dato in salida.items():
+                click.echo(_resumir_dato(nombre_nodo, dato))
+                if dir_salida is not None:
+                    # subcarpeta por imagen para no pisar resultados entre sí
+                    subdir = dir_salida / Path(ruta_str).stem
+                    ruta_guardada = _guardar_dato(nombre_nodo, dato, subdir)
+                    if ruta_guardada:
+                        click.echo(f"      guardado: {ruta_guardada}")
+        else:
+            n_err += 1
+            error = resultado.error
+            click.secho(f"  ✗ Error: {getattr(error, 'mensaje', str(error))}", fg="red")
+
+    click.echo()
+    click.secho(f"Batch terminado: {n_ok} ok, {n_err} con error(es)", fg=("green" if n_err == 0 else "yellow"))
+    if ruta_log_batch:
+        click.echo(f"Resumen TSV: {ruta_log_batch}")
 
 
 
@@ -200,12 +349,37 @@ def listar(dir_path):
 # COMANDO: pipeline validar
 # ==========================================
 
-@pipeline.command()
-def validar():
+@pipeline.command(name="validar_pipeline")
+@click.option(
+    "--yaml",
+    "yaml_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Archivo YAML del pipeline a validar.",
+)
+def validar(yaml_path):
     """
-    Valida un pipeline.
+    Valida un pipeline sin ejecutar imágenes.
     """
-    click.echo("Validando pipeline...")
+    # CAMBIO 7: validar ahora hace trabajo real usando el validador del núcleo.
+    from bioImageLab.nucleo.gestorLab.Validar_Flujo_Trabajo import validar_pipeline
+
+    gestor = GestorLab()
+    try:
+        flujo = gestor.registrar_desde_yaml(yaml_path)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        raise click.ClickException(f"No se pudo cargar el pipeline: {e}")
+
+    diagnostico = validar_pipeline(flujo.grafo).unwrap()
+    click.echo(f"Pipeline: {flujo.nombre}")
+    click.echo(diagnostico.resumen())
+
+    for evento in diagnostico.eventos:
+        nivel = evento.nivel.value.upper()
+        click.echo(f"  [{nivel}] {evento.mensaje}")
+
+    if not diagnostico.es_valido:
+        raise click.exceptions.Exit(1)
 
 
 # ==========================================
@@ -213,11 +387,25 @@ def validar():
 # ==========================================
 
 @pipeline.command()
-def grafo():
+@click.option(
+    "--yaml",
+    "yaml_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Archivo YAML del pipeline.",
+)
+def grafo(yaml_path):
     """
     Muestra el grafo de un pipeline.
     """
-    click.echo("Mostrando grafo...")
+    # CAMBIO 8: usa la visualización que ya existe en GestorLab.
+    gestor = GestorLab()
+    try:
+        flujo = gestor.registrar_desde_yaml(yaml_path)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        raise click.ClickException(f"No se pudo cargar el pipeline: {e}")
+
+    gestor.mostrar_grafo(flujo.nombre)
 
 
 # ==========================================
@@ -225,11 +413,25 @@ def grafo():
 # ==========================================
 
 @pipeline.command()
-def orden():
+@click.option(
+    "--yaml",
+    "yaml_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Archivo YAML del pipeline.",
+)
+def orden(yaml_path):
     """
-    Muestra el orden de ejecución de un pipeline.
+    Muestra el orden topológico de ejecución de un pipeline.
     """
-    click.echo("Mostrando orden de ejecución...")
+    # CAMBIO 9: usa la visualización que ya existe en GestorLab.
+    gestor = GestorLab()
+    try:
+        flujo = gestor.registrar_desde_yaml(yaml_path)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        raise click.ClickException(f"No se pudo cargar el pipeline: {e}")
+
+    gestor.mostrar_orden_ejecucion(flujo.nombre)
 
 
 # ==========================================

@@ -1,21 +1,13 @@
-# =====================================================================
-# Repro del bug de cuantificación, respetando el orden oficial del
-# pipeline (README): normalización → filtración → segmentación → cuantificación
-#
-# Objetivo: confirmar que el fallo NO depende del orden de etapas,
-# sino de un mismatch de contrato (4D vs 2D) en los métodos de
-# cuantificación concretos.
-# =====================================================================
+nombre_pipeline: "pipeline_cuantificacion_valida"
 
-nombre_pipeline: "pipeline_cuantificacion_repro"
-
-ruta_log:      "log_cuant_repro.txt"
-modo_qc:       false
-ruta_qc:       "qc_cuant_repro.png"
-canal_qc:      0
+ruta_log: "log_cuantificacion_valida.txt"
+modo_qc: false
+ruta_qc: "qc_cuantificacion_valida.png"
+canal_qc: 0
 modo_estricto: false
 
 etapas:
+
   # 1. PREPROCESAMIENTO
   - preprocesamiento:
       - metodo: max_norm
@@ -32,21 +24,21 @@ etapas:
         params:
           radio: 5
 
-  # preparación de tipo para binarizar (parte de normalización, no es un paso "extra")
+  # 3. PREPROCESAMIENTO
   - preprocesamiento:
       - metodo: to_uint8
         dominio: normalizacion
         canal: 0
         tipo_aplicacion: global
 
-  # 5. SEGMENTADORES
+  # 4. SEGMENTACIÓN
   - segmentacion:
       - metodo: otsu
         dominio: segmentacion
         canal: 0
         tipo_aplicacion: por_corte_espaciotemporal
 
-  # 6. CUANTIFICADORES
+  # 5. CUANTIFICACIÓN
   - cuantificacion:
       - metodo: area
         dominio: cuantificacion
