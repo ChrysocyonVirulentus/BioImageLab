@@ -1,0 +1,160 @@
+============================================================
+  PIPELINE : pipeline_merge_test
+  INICIO   : 2026-08-10T14:46:11.735389+00:00
+  FIN      : 2026-08-10T14:46:32.530391+00:00
+  EVENTOS  : 31
+  ERRORES  : 5
+  WARNINGS : 4
+============================================================
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_dag
+  mensaje: DAG válido — 7 nodos en orden topológico
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_estructura
+  mensaje: Nodos iniciales: ['input']
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_estructura
+  mensaje: Nodos finales: ['merge_fusion_principal_cuantificacion_media_intensidad']
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_dependencias/preprocesamiento_max_norm
+  mensaje: Dependencias OK para 'preprocesamiento_max_norm' (PREPROCESAMIENTO)
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_dependencias/procesamiento_fft_pasabajo
+  mensaje: Dependencias OK para 'procesamiento_fft_pasabajo' (FILTRACION)
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_semantica/procesamiento_fft_pasabajo
+  mensaje: Compatibilidad OK: PREPROCESAMIENTO → FILTRACION
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_dependencias/preprocesamiento_to_uint8
+  mensaje: Dependencias OK para 'preprocesamiento_to_uint8' (PREPROCESAMIENTO)
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_semantica/preprocesamiento_to_uint8
+  mensaje: Compatibilidad OK: PREPROCESAMIENTO → PREPROCESAMIENTO
+
+[2026-08-10T14:46:11.736387+00:00] ⚠ [WARN]
+  etapa  : validacion_dependencias/segmentacion_otsu
+  mensaje: SEGMENTADOR recomienda haber ejecutado: FILTRACION (resultados pueden ser subóptimos)
+  operacion: segmentacion_otsu
+  categoria: SEGMENTADOR
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_semantica/segmentacion_otsu
+  mensaje: Compatibilidad OK: PREPROCESAMIENTO → SEGMENTADOR
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_dependencias/pass_imagen_fusion_principal
+  mensaje: Dependencias OK para 'pass_imagen_fusion_principal' (PREPROCESAMIENTO)
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_semantica/pass_imagen_fusion_principal
+  mensaje: Compatibilidad OK: FILTRACION → PREPROCESAMIENTO
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_merge/merge_fusion_principal
+  mensaje: Nodo merge 'merge_fusion_principal' OK — espera 2 inputs
+
+[2026-08-10T14:46:11.736387+00:00] ✗ [ERROR]
+  etapa  : validacion_dependencias/pass_mascara_fusion_principal
+  mensaje: SEGMENTADOR requiere obligatoriamente: PREPROCESAMIENTO
+  operacion: pass_mascara_fusion_principal
+  categoria: SEGMENTADOR
+
+[2026-08-10T14:46:11.736387+00:00] ⚠ [WARN]
+  etapa  : validacion_dependencias/pass_mascara_fusion_principal
+  mensaje: SEGMENTADOR recomienda haber ejecutado: FILTRACION (resultados pueden ser subóptimos)
+  operacion: pass_mascara_fusion_principal
+  categoria: SEGMENTADOR
+
+[2026-08-10T14:46:11.736387+00:00] ✗ [ERROR]
+  etapa  : validacion_semantica/pass_mascara_fusion_principal
+  mensaje: Incompatibilidad sin adaptador conocido: SEGMENTADOR → SEGMENTADOR
+  desde   : SEGMENTADOR
+  hacia   : SEGMENTADOR
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_merge/merge_fusion_principal
+  mensaje: Nodo merge 'merge_fusion_principal' OK — espera 2 inputs
+
+[2026-08-10T14:46:11.736387+00:00] ⚠ [WARN]
+  etapa  : validacion_dependencias/cuantificacion_media_intensidad
+  mensaje: CUANTIFICADOR recomienda haber ejecutado: FILTRACION (resultados pueden ser subóptimos)
+  operacion: cuantificacion_media_intensidad
+  categoria: CUANTIFICADOR
+
+[2026-08-10T14:46:11.736387+00:00] ✗ [ERROR]
+  etapa  : validacion_semantica/cuantificacion_media_intensidad
+  mensaje: Conexión semánticamente inválida: PREPROCESAMIENTO → CUANTIFICADOR
+  desde   : PREPROCESAMIENTO
+  hacia   : CUANTIFICADOR
+
+[2026-08-10T14:46:11.736387+00:00] ✓ [INFO]
+  etapa  : validacion_semantica/cuantificacion_media_intensidad
+  mensaje: Compatibilidad OK: SEGMENTADOR → CUANTIFICADOR
+
+[2026-08-10T14:46:11.736387+00:00] ⚠ [WARN]
+  etapa  : validacion_resumen
+  mensaje: [Validación ✗ CON ERRORES] 3 errores  3 warnings  14 infos
+
+[2026-08-10T14:46:31.680391+00:00] ✓ [INFO]
+  etapa  : carga
+  mensaje: Imagen cargada: shape=(1, 1, 4, 1024, 1024) canales=(np.str_('515/30'), np.str_('590/50'), np.str_('650LP'), np.str_('Trans'))
+
+[2026-08-10T14:46:31.705391+00:00] ✓ [INFO]
+  etapa  : preprocesamiento
+  mensaje: 'preprocesamiento_max_norm' OK
+  nodo    : input
+  destino : input_preprocesamiento_max_norm
+
+[2026-08-10T14:46:32.397390+00:00] ✓ [INFO]
+  etapa  : filtracion
+  mensaje: 'procesamiento_fft_pasabajo' OK
+  nodo    : input_preprocesamiento_max_norm
+  destino : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo
+
+[2026-08-10T14:46:32.433389+00:00] ✓ [INFO]
+  etapa  : preprocesamiento
+  mensaje: 'preprocesamiento_to_uint8' OK
+  nodo    : input_preprocesamiento_max_norm
+  destino : input_preprocesamiento_max_norm_preprocesamiento_to_uint8
+
+[2026-08-10T14:46:32.433389+00:00] ✓ [INFO]
+  etapa  : preprocesamiento
+  mensaje: 'pass_imagen_fusion_principal' OK
+  nodo    : input_preprocesamiento_max_norm_procesamiento_fft_pasabajo
+  destino : merge_fusion_principal
+
+[2026-08-10T14:46:32.524391+00:00] ✓ [INFO]
+  etapa  : segmentador
+  mensaje: 'segmentacion_otsu' OK
+  nodo    : input_preprocesamiento_max_norm_preprocesamiento_to_uint8
+  destino : input_preprocesamiento_max_norm_preprocesamiento_to_uint8_segmentacion_otsu
+
+[2026-08-10T14:46:32.524391+00:00] ✓ [INFO]
+  etapa  : segmentador
+  mensaje: 'pass_mascara_fusion_principal' OK
+  nodo    : input_preprocesamiento_max_norm_preprocesamiento_to_uint8_segmentacion_otsu
+  destino : merge_fusion_principal
+
+[2026-08-10T14:46:32.525390+00:00] ✓ [INFO]
+  etapa  : merge
+  mensaje: Merge 'merge_fusion_principal' OK (2 inputs combinados)
+  nodo    : merge_fusion_principal
+  n_inputs: 2
+
+[2026-08-10T14:46:32.529392+00:00] ✗ [ERROR]
+  etapa  : pipeline -> cuantificacion
+  mensaje: [merge_fusion_principal → merge_fusion_principal_cuantificacion_media_intensidad] 'cuantificacion_media_intensidad' falló: Error en 'media_intensidad': MediaIntensidad.__call__() missing 1 required positional argument: 'img_procesada'
+  nodo_origen: merge_fusion_principal
+  nodo_destino: merge_fusion_principal_cuantificacion_media_intensidad
+
+[2026-08-10T14:46:32.529392+00:00] ✗ [ERROR]
+  etapa  : pipeline
+  mensaje: Ejecución con fallo: [merge_fusion_principal → merge_fusion_principal_cuantificacion_media_intensidad] 'cuantificacion_media_intensidad' falló: Error en 'media_intensidad': MediaIntensidad.__call__() missing 1 required positional argument: 'img_procesada'

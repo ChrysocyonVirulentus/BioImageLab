@@ -1,0 +1,58 @@
+# =====================================================================
+# Repro siguiendo la precondición confirmada: cuantificación necesita
+# (imagen normalizada/filtrada) + (imagen segmentada) vía merge.
+# Usamos canal 1 (590/50), que tiene señal real, a diferencia del
+# canal 0 que está vacío en esta imagen de prueba.
+# =====================================================================
+
+nombre_pipeline: "pipeline_merge_test"
+
+ruta_log:      "log_merge_test.txt"
+modo_qc:       false
+ruta_qc:       "qc_merge_test.png"
+canal_qc:      1
+modo_estricto: false
+
+etapas:
+  - preprocesamiento:
+      - metodo: max_norm
+        dominio: normalizacion
+        canal: 1
+        tipo_aplicacion: global
+        anchor: post_norm
+
+  - filtracion:
+      - metodo: fft_pasabajo
+        dominio: filtracion
+        canal: 1
+        tipo_aplicacion: por_corte_espaciotemporal
+        params:
+          radio: 5
+        anchor: post_filtrado
+
+  - split:
+      nombre: rama_segmentacion
+      desde:  post_norm
+      etapas:
+        - preprocesamiento:
+            - metodo: to_uint8
+              dominio: normalizacion
+              canal: 1
+              tipo_aplicacion: global
+
+        - segmentacion:
+            - metodo: otsu
+              dominio: segmentacion
+              canal: 1
+              tipo_aplicacion: por_corte_espaciotemporal
+
+  - merge:
+      nombre:     fusion_principal
+      estrategia: imagen_mascara
+      imagen:     post_filtrado
+      mascara:    rama_segmentacion
+
+  - cuantificacion:
+      - metodo: media_intensidad
+        dominio: cuantificacion
+        canal: 1

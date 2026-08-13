@@ -145,6 +145,9 @@ def run(yaml_path, imagen_path, debug, dir_salida):
         raise SystemExit(1)
 
 
+
+
+
 # ==========================================
 # GRUPO: pipeline
 # ==========================================
