@@ -38,6 +38,9 @@ class RegistroMetodos:
 
         return self._registro[dominio][nombre]
 
+    def listar_dominios(self):
+        return list(self._registro.keys())
+    
     def listar(self, dominio: str):
         return list(self._registro.get(dominio, {}).keys())
 

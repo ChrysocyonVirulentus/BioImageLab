@@ -12,8 +12,8 @@ except ImportError:
 
 from bioImageLab.nucleo.gestorLab.Gestor_Lab import GestorLab
 from bioImageLab.nucleo.controlador.Controlador_BioImagen import BioImagenData
+from bioImageLab.nucleo.gestorLab.Registro_Metodos import registro_metodos
 
-# CAMBIO 1: formatos de imagen aceptados por BioImageLab para --dir.
 FORMATOS_BIOIMAGEN = {".ids", ".ics", ".tif", ".tiff"}
 
 
@@ -24,6 +24,133 @@ def cli():
     """
     pass
 
+# ==========================================
+# AYUDA
+# ==========================================
+
+@cli.command()
+@click.pass_context
+def ayuda(ctx):
+    """Muestra la ayuda general de BioImageLab."""
+    click.echo(ctx.parent.get_help())
+
+
+# ==========================================
+# COMANDO: cargar
+# ==========================================
+
+@cli.command()
+@click.option(
+    "--imagen",
+    "imagen_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Ruta de la imagen que se desea cargar.",
+)
+def cargar(imagen_path):
+    """
+    Carga una imagen en el espacio de trabajo de BioImageLab.
+    """
+    if imagen_path.suffix.lower() not in FORMATOS_BIOIMAGEN:
+        raise click.ClickException(
+            f"Formato no soportado: '{imagen_path.suffix}'. "
+            f"Formatos aceptados: {', '.join(sorted(FORMATOS_BIOIMAGEN))}"
+        )
+
+    dir_imagenes = Path("data") / "imagenes"
+    dir_imagenes.mkdir(parents=True, exist_ok=True)
+
+    destino = dir_imagenes / imagen_path.name
+
+    if destino.exists():
+        raise click.ClickException(
+            f"La imagen '{imagen_path.name}' ya existe en '{dir_imagenes}'."
+        )
+
+    try:
+        import shutil
+        shutil.copy2(imagen_path, destino)
+    except OSError as e:
+        raise click.ClickException(
+            f"No se pudo cargar la imagen: {e}"
+        )
+
+    click.secho(
+        f"✓ Imagen cargada correctamente: {destino}",
+        fg="green",
+    )
+
+
+# ==========================================
+# GRUPO: ver
+# ==========================================
+
+@cli.group()
+def ver():
+    """
+    Muestra información disponible en BioImageLab.
+    """
+    pass
+
+# ==========================================
+# COMANDO: ver imagen
+# ==========================================
+
+@ver.command(name="imagen")
+def ver_imagen():
+    """
+    Muestra las imágenes cargadas en BioImageLab.
+    """
+    dir_imagenes = Path("data") / "imagenes"
+
+    if not dir_imagenes.exists():
+        click.echo("No existe el directorio de imágenes.")
+        return
+
+    imagenes = sorted(
+        ruta
+        for ruta in dir_imagenes.iterdir()
+        if ruta.is_file() and ruta.suffix.lower() in FORMATOS_BIOIMAGEN
+    )
+
+    if not imagenes:
+        click.echo("No hay imágenes cargadas en BioImageLab.")
+        return
+
+    click.echo("Imágenes disponibles:\n")
+
+    for imagen in imagenes:
+        click.echo(f"  • {imagen.name}")
+        click.echo(f"      formato: {imagen.suffix.lower()}")
+        click.echo(f"      ruta:    {imagen}")
+
+# ==========================================
+# COMANDO: ver funciones
+# ==========================================
+
+def listar_dominios(self):
+    return list(self._registro.keys())
+
+@ver.command(name="funciones")
+def ver_funciones():
+    """
+    Muestra las funciones/métodos registrados en BioImageLab.
+    """
+    dominios = registro_metodos.listar_dominios()
+
+    if not dominios:
+        click.echo("No hay funciones registradas en BioImageLab.")
+        return
+
+    click.echo("Funciones disponibles:\n")
+
+    for dominio in sorted(dominios):
+        click.echo(f"  {dominio}:")
+
+        for metodo in sorted(registro_metodos.listar(dominio)):
+            click.echo(f"    • {metodo}")
+
+        click.echo()
 
 # ==========================================
 # HELPERS: resumen / guardado de resultados
@@ -77,6 +204,66 @@ def _guardar_dato(nombre_nodo: str, dato, dir_salida: Path) -> Optional[Path]:
 
     return None
 
+def mostrar_resultado(resultado, dir_salida):
+    """
+    Muestra el resultado de una ejecución y guarda los datos
+    finales si se indicó un directorio de salida.
+    """
+
+    if resultado.es_ok():
+        salida, logs = resultado.unwrap()
+
+        n_err = sum(
+            1 for l in logs
+            if l.nivel.value == "error"
+        )
+
+        n_warn = sum(
+            1 for l in logs
+            if l.nivel.value == "warn"
+        )
+
+        click.secho(
+            f"✓ Ejecución completada ({len(salida)} nodo(s) final(es))",
+            fg="green",
+        )
+
+        if n_err or n_warn:
+            click.echo(
+                f"  ({n_err} errores, {n_warn} warnings en el log)"
+            )
+
+        click.echo()
+
+        for nombre_nodo, dato in salida.items():
+            click.echo(_resumir_dato(nombre_nodo, dato))
+
+            if dir_salida is not None:
+                ruta_guardada = _guardar_dato(
+                    nombre_nodo,
+                    dato,
+                    dir_salida,
+                )
+
+                if ruta_guardada:
+                    click.echo(f"      guardado: {ruta_guardada}")
+                else:
+                    click.echo(
+                        f"      (no se sabe guardar tipo "
+                        f"{type(dato).__name__}, se omite)"
+                    )
+
+    else:
+        error = resultado.error
+
+        click.secho(
+            f"✗ Error: {getattr(error, 'mensaje', str(error))}",
+            fg="red",
+            err=True,
+        )
+
+        raise SystemExit(1)
+
 
 # ==========================================
 # COMANDO: run
@@ -96,72 +283,111 @@ def _guardar_dato(nombre_nodo: str, dato, dir_salida: Path) -> Optional[Path]:
     required=True,
 )
 @click.option(
-    "--debug",
-    is_flag=True,
-    default=False,
-    help="Activa debug: imprime cada paso y genera QC visual.",
+    "--modo",
+    type=click.Choice(
+        ["stepless", "debug", "step"],
+        case_sensitive=False,
+    ),
+    default="stepless",
+    show_default=True,
+    help="Modo de ejecución del pipeline.",
 )
 @click.option(
     "--output",
     "dir_salida",
     type=click.Path(path_type=Path),
     default=None,
-    help="Directorio donde guardar los resultados (imagen .npy / tabla .csv).",
+    help="Directorio donde guardar los resultados.",
 )
-def run(yaml_path, imagen_path, debug, dir_salida):
+def run(yaml_path, imagen_path, modo, dir_salida):
     """
     Ejecuta un pipeline sobre una imagen.
     """
+
+    modo = modo.lower()
+
+    if modo == "stepless":
+        ejecutar_stepless(
+            yaml_path,
+            imagen_path,
+            dir_salida,
+        )
+
+    elif modo == "debug":
+        ejecutar_debug(
+            yaml_path,
+            imagen_path,
+            dir_salida,
+        )
+
+def ejecutar_stepless(yaml_path, imagen_path, dir_salida):
+    """
+    Ejecuta el pipeline completo sin mostrar información intermedia.
+    """
+
     gestor = GestorLab()
 
     try:
         flujo = gestor.registrar_desde_yaml(yaml_path)
     except (FileNotFoundError, ValueError, KeyError) as e:
-        raise click.ClickException(f"No se pudo registrar el pipeline: {e}")
+        raise click.ClickException(
+            f"No se pudo registrar el pipeline: {e}"
+        )
 
-    click.echo(f"Pipeline registrado: {flujo.nombre}")
-
-    # CAMBIO 2: proteger la ejecución individual para que una excepción
-    # inesperada no termine mostrando un traceback completo al usuario.
     try:
         resultado = gestor.ejecutar_desde_ruta(
             flujo.nombre,
             imagen_path,
-            debug=debug,
+            debug=False,
         )
     except Exception as e:
-        raise click.ClickException(f"Error durante la ejecución: {e}")
+        raise click.ClickException(
+            f"Error durante la ejecución: {e}"
+        )
 
-    if resultado.es_ok():
-        salida, logs = resultado.unwrap()
-        n_err  = sum(1 for l in logs if l.nivel.value == "error")
-        n_warn = sum(1 for l in logs if l.nivel.value == "warn")
+    mostrar_resultado(
+        resultado,
+        dir_salida,
+    )
 
-        click.secho(f"✓ Ejecución completada ({len(salida)} nodo(s) final(es))", fg="green")
-        if n_err or n_warn:
-            click.echo(f"  ({n_err} errores, {n_warn} warnings en el log)")
+def ejecutar_debug(yaml_path, imagen_path, dir_salida):
+    """
+    Ejecuta el pipeline completo con información de debug.
+    """
 
-        click.echo()
-        for nombre_nodo, dato in salida.items():
-            click.echo(_resumir_dato(nombre_nodo, dato))
+    gestor = GestorLab()
 
-            if dir_salida is not None:
-                ruta_guardada = _guardar_dato(nombre_nodo, dato, dir_salida)
-                if ruta_guardada:
-                    click.echo(f"      guardado: {ruta_guardada}")
-                else:
-                    click.echo(f"      (no se sabe guardar tipo {type(dato).__name__}, se omite)")
-    else:
-        error = resultado.error
-        click.secho(f"✗ Error: {getattr(error, 'mensaje', str(error))}", fg="red", err=True)
-        raise SystemExit(1)
+    try:
+        flujo = gestor.registrar_desde_yaml(yaml_path)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        raise click.ClickException(
+            f"No se pudo registrar el pipeline: {e}"
+        )
 
+    click.echo(f"Pipeline registrado: {flujo.nombre}")
+    click.echo("Modo: DEBUG\n")
+
+    try:
+        resultado = gestor.ejecutar_desde_ruta(
+            flujo.nombre,
+            imagen_path,
+            debug=True,
+        )
+    except Exception as e:
+        raise click.ClickException(
+            f"Error durante la ejecución: {e}"
+        )
+
+    mostrar_resultado(
+        resultado,
+        dir_salida,
+    )
 
 # ==========================================
 # COMANDO: run batch
 # ==========================================
 
-@cli.command(name="batch")  # CAMBIO 3: antes era run-batch
+@cli.command(name="batch")  
 @click.option(
     "--yaml",
     "yaml_path",
